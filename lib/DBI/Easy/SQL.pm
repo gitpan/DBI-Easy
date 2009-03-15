@@ -1,5 +1,5 @@
 package DBI::Easy;
-# $Id: SQL.pm,v 1.13 2009/02/09 15:49:48 apla Exp $
+# $Id: SQL.pm,v 1.2 2009/03/15 07:33:48 apla Exp $
 
 use strict;
 use warnings;

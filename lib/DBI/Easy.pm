@@ -5,7 +5,7 @@ use Class::Easy;
 use DBI 1.601;
 
 use vars qw($VERSION);
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -485,41 +485,171 @@ sub deprefix_cols {
 
 =head1 NAME
 
-DBI::Easy - ORM made easy.
+DBI::Easy - yet another perl ORM for SQL databases
+
+=head1 DESCRIPTION
+
+DBI::Easy is another ORM, aimed at making the life of the developer 
+using it a lot easier.
+
+=head1 INTRODUCTION 
+
+The key notions of DBI::Easy are data records, collection of data records
+and relations between them. A data record is a presentation of SQL result:
+row or blessed hash, depending on how you look at it. Data records collection 
+is a set of records limited by certain criteria or without any limitations.
+the differentiation between collections and records has to do with
+different relations between them: one-to-one, one-to-many, many-to-many.
+
+For Example: Within a domain auction based on DBI::Easy, every user may 
+have a few bids, but each bid belongs to just one concrete user.
+
+It's also worth mentioning the relations between DBI::Easy and SQL. DBI::Easy
+is currently using a small set of sql, limited to tables and views, 
+including four operations to work with data: insert, update, select, delete. 
+The relations between SQL objects are not formed automatically with the help 
+of constraints.
+
+Also it's important that DBI::Easy is not trying to hide SQL from you. 
+If you need it you can use it fully. However, it allows carrying out the vast 
+majority of simple operations with data without the participation of SQL.
 
 =head1 SYNOPSIS
 
-	package Entity::Passport;
+Let's start from the most simple things. To start the work you will need two 
+modules that will return database handler ($dbh) upon request.
 
-	use Class::Easy;
+To avoid unpleasant consequences it's recommended to cache the returned 
+connection only after the fork, if there is a fork in your code.
+for the case when CL environment variables for DBI_DSN and DBI_* are defined,
+and they can be used to establish a connection that doesn't need to be cached,
+you can do without these modules at all. The main task for 'Entity' is to 
+acquire DBI::Easy::Record[::Collection] or one of the child classes.
 
+	package DBEntity;
+	use strict;
+	use DBI;
 	use DBI::Easy::Record;
 	use base qw(DBI::Easy::Record);
+	sub dbh {		# optional. You don't have to write a procedure similar to this one since
+					# DBI->connect is requested when a ready $dbh hasn't been provided
+		return DBI->connect;
+	};
+	1;
 
-	# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+#-----------------------------------------
 
-	package main;
+	package DBEntity::Collection;
+	use strict;
+	use DBI::Easy::Record::Collection;
+	use base qw(DBI::Easy::Record::Collection);
+	1;
 
-	use Class::Easy;
+Now let's get down to something concrete. Let's assume we have a user and his 
+passport data (one-to-one relation) and some contact data (one-to-many) 
+NOTE: the many-to-many relations hasn't been realized yet.
 
-	# connect to database
+
+	package Entity::Passport;
+	use strict;
+	use DBEntity;
+	use base qw(DBEntity);
+	1;
+
+#-----------------------------------------
+
+	package Entity::Contact;
+	use strict;
+	use DBEntity;
+	use base qw(DBEntity);
+1;
+
+#-----------------------------------------
+
+	package Entity::Contact::Collection;
+	use strict;
+	use DBEntity::Collection;
+	use base qw(DBEntity::Collection);
+	1;
+
+#-----------------------------------------
+
+	package Entity::Account;
+	use strict;
+	use DBEntity;
+	use base qw(DBEntity);
 	use Entity::Passport;
+	use Entity::Contact::Collection;
 
-	# create new record in memory
-	my $passport = Entity::Passport->new ({
-		code => '125434534'
+	sub _init_last {
+		my $self = shift;
+		$self->is_related_to (
+			passport => 'Entity::Passport'
+		);
+		$self->is_related_to (
+			contacts => 'Entity::Contact::Collection'
+		);
+	}
+	1;
+
+#-----------------------------------------
+
+	package Entity::Account::Collection;
+	use strict;
+	use DBEntity::Collection;
+	use base qw(DBEntity::Collection);
+	1;
+
+#-----------------------------------------
+
+Now let's create some SQL tables for our test application (using SQLite):
+
+	create table account (
+		account_id serial not null primary key,
+		account_login varchar (50) not null
+	);
+	create table pasport (
+		passport_id serial not null primary key,
+		passport_serial varchar (50) not null,
+		account_id integer
+	);
+	create table contact (
+		contact_id serial not null primary key,
+		contact_proto varchar (10) not null,
+		contact_address varchar (200) not null,
+		account_id integer
+	);
+
+And now the funniest part: the script itself:
+
+#-----------------------------------------
+
+	#!/usr/bin/perl
+
+	use strict;
+	use Entity::Account;
+
+	# here it doesn`t matter whether there is a user with such a login in
+	# the database, if needed we can create it.
+
+	my $account = Entity::Account->fetch_or_create ({login => 'apla'});
+
+	# here fetch_or_create is implicitly activated with the parameters
+	# {id => $account->id, serial => 'aabbcc'}
+
+	$account->passport ({serial => 'aabbcc'});
+
+	my $acc_contacts = $account->contacts;
+
+	my $contact = $acc_contacts->new_record ({
+		proto => 'email', address => 'apla@localhost'
 	});
+	$contact->save;
+	$acc_contacts->count; 
 
-	# insert into database
-	$passport->save;
+	1;
 
-=head1 METHODS
 
-=head2 new
-
-TODO
-
-=cut
 
 =head1 AUTHOR
 
@@ -542,10 +672,10 @@ of progress on your bug as I make changes.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2007-2009 Ivan Baktsheev
+Copyright 2008-2009 Ivan Baktsheev
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
-
 =cut
+
