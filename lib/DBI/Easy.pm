@@ -5,7 +5,7 @@ use Class::Easy;
 use DBI 1.601;
 
 use vars qw($VERSION);
-$VERSION = '0.02';
+$VERSION = '0.05';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -158,10 +158,16 @@ sub _init_collection {
 		
 		$rec_pkg = join '::', @pack_chunks;
 		
-		unless (try_to_use ($rec_pkg)) {
-			warn $@;
-			$rec_pkg = join '::', @pack_chunks, 'Record';
-			die unless (try_to_use ($rec_pkg));
+		# TODO: move to Class::Easy
+		my $count = eval ("scalar grep {!/\\w+\:\:/} keys \%$rec_pkg\::;")
+			+ eval ("scalar keys \%$rec_pkg\::Record\::;");
+		
+		unless ($count) {
+			unless (try_to_use ($rec_pkg)) {
+				warn $@;
+				$rec_pkg = join '::', @pack_chunks, 'Record';
+				die unless (try_to_use ($rec_pkg));
+			}
 		}
 		
 		$self->record_package ($rec_pkg);
@@ -195,10 +201,10 @@ sub _init_make_accessors {
 	foreach my $col_name (keys %$cols) {
 		my $col_meta = $cols->{$col_name};
 		# here we translate rows
-		my $field_name = $col_name;
+		my $field_name = lc ($col_name); # oracle fix
 		
-		if (defined $prefix and $prefix ne '' and $col_name =~ /^$prefix(.*)/) {
-			$field_name = $1;
+		if (defined $prefix and $prefix ne '' and $col_name =~ /^$prefix(.*)/i) {
+			$field_name = lc($1);
 		}
 		
 		# field meta referenced to column meta
@@ -207,9 +213,14 @@ sub _init_make_accessors {
 		
 		$col_meta->{field_name} = $field_name;
 		
-		if ($col_meta->{TYPE_NAME} eq 'ENUM' and $#{$col_meta->{mysql_values}} >= 0) {
+		if ($col_meta->{type_name} eq 'ENUM' and $#{$col_meta->{mysql_values}} >= 0) {
 			make_accessor ($class, "${field_name}_variants",
 				default => $col_meta->{mysql_values});
+		}
+		
+		if ($col_meta->{type_name} =~ /DATE|TIMESTAMP(?:\(\d+\))?|DATETIME/) {
+			#TODO
+			
 		}
 		
 		if (exists $col_meta->{X_IS_PK} and $col_meta->{X_IS_PK} == 1) {
@@ -246,9 +257,18 @@ sub _dbh_columns_info {
 	my $class = shift;
 	
 	my $ts = timer ('inside columns info');
-	
-	my $table = $class->table;
+
 	my $dbh = $class->dbh;
+
+	my $vendor = lc($dbh->get_info(17));
+	
+	make_accessor ($class, 'dbh_vendor', default => $vendor);
+	
+	if ($vendor eq 'oracle') {
+		$class->table (uc($class->table));
+	}
+
+	my $table = $class->table;
 	
 	$ts->lap ('make accessor');
 	
@@ -272,8 +292,9 @@ sub _dbh_columns_info {
 		
 		$t->lap ('execute');
 		
-		$sth->execute;
-
+		$sth->execute
+			unless $sth->{Executed};
+		
 		$t->lap ('fetchrow hashref');
 		
 		while (my $row = $sth->fetchrow_hashref) {
@@ -283,7 +304,7 @@ sub _dbh_columns_info {
 			
 			$column_info->{$column_name} = {
 				(map {
-					$_ => $row->{$_}
+					lc($_) => $row->{$_}
 				} grep {
 					exists $GREP_COLUMN_INFO{$_}
 				} keys %$row),
@@ -341,8 +362,6 @@ sub _dbh_columns_info {
 			# warn "no primary keys for table '$table'";
 		}
 	};
-	
-	
 	
 	return
 		if $class->_dbh_error ($@);
@@ -405,9 +424,16 @@ sub _prefix_manipulations {
 	
 	if ($in_place) {
 		map {
-			$values->{$entities->{$_}->{$ent_key}} = delete $values->{$_}
+			next
+				if /^:\w+/;
+			
+			my $ent = $entities->{$_};
+			#TODO
+			my $ent_type = $ent->{type_name};
+		
+			$values->{$ent->{$ent_key}} = delete $values->{$_}
 		} grep {
-			exists $entities->{$_}
+			exists $entities->{$_} or /^:\w+/
 		} keys %$values;
 	} else {
 		my @defined_keys = grep {
@@ -418,6 +444,8 @@ sub _prefix_manipulations {
 		my %defined = map {
 			$entities->{$_}->{$ent_key} => $values->{$_}
 		} @defined_keys;
+		
+		map {$defined{$_} = $values->{$_}} grep {/^:\w+/} keys %$values;
 		
 		return \%defined;
 	}

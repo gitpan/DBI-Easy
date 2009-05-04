@@ -1,8 +1,7 @@
 package DBI::Easy::Test::Contact;
 
-use strict;
+use Class::Easy;
 
-use DBI::Easy::Record;
 use base qw(DBI::Easy::Record);
 
 1;

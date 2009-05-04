@@ -77,9 +77,25 @@ $placeholders =~ s/[^?]//g;
 
 ok length ($placeholders) eq $values_count;
 
-my ($sql_part, $values_list) = $test->sql_where ($values);
+my ($sql_part, $values_list) = $test->sql_where ({
+	test => 'like :test_value', ':test_value' => 'test_value_111'
+});
+
+my $q = $dbh->quote_identifier ('test');
+
+ok $sql_part =~ /$q like ?/;
+ok $values_list->[-1] eq 'test_value_111';
+
+diag $sql_part;
+diag join ', ', @$values_list;
+
+($sql_part, $values_list) = $test->sql_where ($values);
 
 diag Dumper $values_list;
+
+
+
+
 
 my @params_list = split (/\sand\s/, $sql_part);
 foreach my $counter (0 .. $#params_list) {

@@ -1,3 +1,12 @@
+2009-05-04	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.05
+
+	Added partial support for Oracle
+	Added support for handled fetch
+	Extended SQL support 
+
+
 2009-03-15	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.02

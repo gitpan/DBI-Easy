@@ -2,8 +2,7 @@ package DBI::Easy;
 
 # use Hash::Merge;
 
-use strict;
-use warnings;
+use Class::Easy;
 
 sub statement {
 	my $self      = shift;
@@ -239,6 +238,8 @@ sub fetch_arrayref {
 	my $sql_args = shift;
 	$sql_args ||= {Slice => {}, MaxRows => undef};
 	
+	my $fetch_handler = shift;
+	
 	my $dbh = $self->dbh;
 	my $result;
 	my $rows_affected;
@@ -253,5 +254,31 @@ sub fetch_arrayref {
 
 	return $result;
 }
+
+sub fetch_handled {
+	my $self = shift;
+	my $statement = shift;
+	my $params = shift;
+	$params ||= [];
+	
+	my $fetch_handler = shift;
+	
+	my $dbh = $self->dbh;
+	my $result;
+	my $rows_affected;
+
+	eval {
+		my $sth = $self->statement ($statement);
+		$rows_affected = $sth->execute (@$params);
+		while (my $row = $sth->fetchrow_hashref) {
+			&$fetch_handler ($row);
+		}
+	};
+
+	return if $self->_dbh_error ($@);
+
+	return $rows_affected;
+}
+
 
 1;

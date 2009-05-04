@@ -1,6 +1,6 @@
 #!/usr/bin/perl -I../../../perl-easy/lib
 
-use strict;
+use Class::Easy;
 
 use Data::Dumper;
 
@@ -75,17 +75,19 @@ my $passport = $account->passport ({type => 'ABC', value => '123123123'});
 
 ok $passport->account_id == $account->id;
 
-use Class::Easy;
-
 $Class::Easy::DEBUG = 'immediately';
 
 my $like_apla = $collection->list;
 
 ok @$like_apla == 2;
 
-my $like_apla = $collection->list ("contact_value like 'apla\%'");
+$like_apla = $collection->list ({value => 'like :username', ':username' => 'apla%'});
 
 ok @$like_apla == 2, 'first like';
+
+$like_apla = $collection->list ("contact_value like 'apla\%'");
+
+ok @$like_apla == 2, 'first like 2';
 
 my $limited = $collection->list ("contact_value like 'apla\%' limit 1");
 
@@ -93,7 +95,7 @@ ok @$limited == 1, 'limited';
 
 ok $collection->count ("contact_value like 'apla\%'") == 2;
 
-my $like_apla = $collection->list ("contact_value like ?", undef, ['apla%']);
+$like_apla = $collection->list ("contact_value like ?", undef, ['apla%']);
 
 ok @$like_apla == 2, 'second like';
 

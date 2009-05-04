@@ -1,11 +1,9 @@
 package DBI::Easy::Record::Collection;
 
-use strict;
+use Class::Easy;
 
 use DBI::Easy;
 use base qw(DBI::Easy);
-
-use Class::Easy;
 
 our $wrapper = 1;
 
@@ -64,16 +62,35 @@ sub make_sql_and_bind {
 
 sub list {
 	my $self   = shift;
+	my $where  = shift || {};
+	my $suffix = shift || '';
+	my $bind_suffix = shift || [];
+	my %params = @_;
 	
-	my ($sql, $bind) = $self->make_sql_and_bind ('sql_select', undef, @_);
+	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix);
 	
-	my $db_result = $self->fetch_arrayref ($sql, $bind);
-	
-	debug "result count: ", $#$db_result+1;
-	
-	$self->columns_to_fields_in_place ($db_result);
-	
-	return $db_result;
+	if ($params{fetch_handler} and ref $params{fetch_handler} eq 'CODE') {
+		
+		debug "fetch by record";
+		
+		$self->fetch_handled (@fetch_params, sub {
+			my $rec = shift;
+			
+			bless $rec, $self->record_package;
+			$rec->columns_to_fields_in_place;
+			$params{fetch_handler}->($rec);
+		});
+		
+		
+	} else {
+		my $db_result = $self->fetch_arrayref (@fetch_params);
+		
+		debug "result count: ", $#$db_result+1;
+		
+		$self->columns_to_fields_in_place ($db_result);
+		
+		return $db_result;
+	}
 }
 
 sub update {
@@ -260,5 +277,59 @@ sub ordered_list {
 	
 	
 }
+
+# page_size, count, page_num, pages_to_show
+sub pager {
+	my $self = shift;
+	my $param = shift;
+
+	my $page_size = $param->{page_size} || 20;
+	my %pager;
+
+	my $number_of_pages = int(($param->{count} + $page_size - 1) / $page_size);
+
+	$pager{pager_needed} = ($param->{count} > $page_size);
+	
+	unless ($pager{pager_needed}) {
+		return;
+	}
+	
+	my $page_number = $param->{page_num} || 0;
+
+	my $pages_to_show = $param->{pages_to_show} || 10;
+	my $quarter_to_show = int ($pages_to_show / 4);
+
+	my @pages;
+	
+	if ($param->{count} <= $pages_to_show) {
+		return [1 .. $param->{count}];
+	}
+	
+	if ($page_number <= $quarter_to_show * 2 + 1) {
+		return [
+			1 .. $quarter_to_show * 3 + 1,
+			undef,
+			$number_of_pages - $quarter_to_show + 1 .. $number_of_pages
+		];
+	}
+
+	if ($page_number >= $number_of_pages - ($quarter_to_show * 2 + 1)) {
+		return [
+			1 .. $quarter_to_show,
+			undef,
+			$number_of_pages - ($quarter_to_show * 3 + 1) .. $number_of_pages
+		];
+	}
+	
+	return [
+		1 .. $quarter_to_show,
+		undef,
+		$page_number - $quarter_to_show .. $page_number + $quarter_to_show,
+		undef,
+		$number_of_pages - $quarter_to_show + 1 .. $number_of_pages
+	];
+	
+}
+
 
 1;

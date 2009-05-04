@@ -1,8 +1,7 @@
 package DBI::Easy;
-# $Id: SQL.pm,v 1.2 2009/03/15 07:33:48 apla Exp $
+# $Id: SQL.pm,v 1.16 2009/05/03 08:06:07 apla Exp $
 
-use strict;
-use warnings;
+use Class::Easy;
 
 use DBI;
 
@@ -82,22 +81,38 @@ sub sql_where {
     return if ref $where_hash ne 'HASH' || scalar keys %$where_hash == 0;
     
 	foreach my $k (keys %$where_hash) {
+		next if $k =~ /^\:/;
 		my $qk = $self->dbh->quote_identifier ($k);
-        if (ref $where_hash->{$k} eq 'ARRAY') {
-        	my $range;
-        	if (! scalar @{$where_hash->{$k}}) {
-        		$range = 'null';
-        	} else {
-        		$range = $self->sql_range ($where_hash->{$k});
-        	}
-            push @where, qq($qk in ($range));
-            push @bind, @{$where_hash->{$k}};
-        } else {
-            push @where, qq($qk = ?);
-            push @bind, $where_hash->{$k};
-        }
-    }
-    
+		my $v = $where_hash->{$k};
+		if (ref $where_hash->{$k} eq 'ARRAY') {
+			my $range;
+			if (! scalar @$v) {
+				$range = 'null';
+			} else {
+				$range = $self->sql_range ($v);
+			}
+			push @where, qq($qk in ($range));
+			push @bind, @$v;
+		} elsif ($v =~ /^\s*(<|<=|=>|>|!=|<>|<=>|like|between|not|is|regexp|rlike)\s/i) {
+			my @ph;
+			my $re = '(^|[\=\,\s\(])(:\w+)([\=\,\s\)]|$)';
+			while ($v =~ /$re/gs) {
+				push @ph, $2;
+			}
+			
+			$v =~ s/$re/ \? /gs;
+			
+			push @where, qq($qk $v);
+			
+			foreach (@ph) {
+				push @bind, $where_hash->{$_};
+			}
+		} else {
+			push @where, qq($qk = ?);
+			push @bind, $where_hash->{$k};
+		}
+	}
+
 	return join (' and ', @where), \@bind;
 }
 
@@ -299,3 +314,122 @@ sub sql_select_count {
 
 
 1;
+
+=head1 NAME
+
+DBI::Easy::SQL - handling sql for DBI::Easy
+
+=head1 ABSTRACT
+
+This module is a SQL expressions constructor for DBI::Easy. 
+So DBI::Easy::SQL is a wrapper between SQL and the rest part of DBI::Easy 
+
+
+=head1 SYNOPSIS
+
+SYNOPSIS
+
+
+=head1 FUNCTIONS
+
+=head2 sql_column_list
+
+returns a list of SQL columns
+
+=cut
+
+=head2 sql_delete, sql_delete_by_pk
+
+creates a SQL DELETE query
+
+=cut
+
+=head2 sql_insert
+
+creates a SQL INSERT query
+
+=cut
+
+=head2 sql_limit
+
+adds limits to SQL query
+
+=cut
+
+=head2 sql_names_range
+
+TODO
+
+=cut
+
+=head2 sql_order
+
+add ORDER BY to SQL query
+
+=cut
+
+=head2 sql_range
+
+create placeholders for ranged sql statements, as example by
+
+	... where column in (?, ?) ...
+	insert into table (col1, col2) values (?, ?) ...
+
+receive number of placeholders to generate or arrayref, returns
+
+	join ', ', ('?' x $num)
+
+=cut
+
+=head2 sql_select, sql_select_by_pk, sql_select_count
+
+creates SELECT SQL query
+
+=cut
+
+=head2 sql_set
+
+creates SET SQL expression (for UPDATE query as an example)
+
+=cut
+
+=head2 sql_update, sql_update_by_pk
+
+creates UPDATE SQL query
+
+=cut
+
+=head2 sql_where
+
+creates WHERE SQL expression
+
+=cut
+
+
+=head1 AUTHOR
+
+Ivan Baktsheev, C<< <apla at the-singlers.us> >>
+
+=head1 BUGS
+
+Please report any bugs or feature requests to my email address,
+or through the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Class-Easy>. 
+I will be notified, and then you'll automatically be notified
+of progress on your bug as I make changes.
+
+=head1 SUPPORT
+
+
+
+=head1 ACKNOWLEDGEMENTS
+
+
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008-2009 Ivan Baktsheev
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=cut
