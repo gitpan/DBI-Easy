@@ -8,6 +8,7 @@ WriteMakefile(
 	PREREQ_PM => {
 		'Class::Easy' => 0.02, # try_to_use support
 		'DBI'         => 1.601,
-		'DBD::SQLite' => 0,
+		'DBD::SQLite' => 1.25,
+		'Time::Piece' => 0,
 	}
 );

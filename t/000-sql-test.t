@@ -10,11 +10,9 @@ use DBI;
 
 BEGIN {
 	
-	$Class::Easy::DEBUG = 'immediately';
-	
 	use_ok 'DBI::Easy';
 	
-	use_ok 'DBD::SQLite', 'we need DBD::SQLite for test';
+	use_ok 'DBD::SQLite';
 	
 	push @INC, 't', 't/DBI-Easy';
 	require 'db-config.pl';
@@ -78,7 +76,7 @@ $placeholders =~ s/[^?]//g;
 ok length ($placeholders) eq $values_count;
 
 my ($sql_part, $values_list) = $test->sql_where ({
-	test => 'like :test_value', ':test_value' => 'test_value_111'
+	_test => 'like :test_value', ':test_value' => 'test_value_111'
 });
 
 my $q = $dbh->quote_identifier ('test');

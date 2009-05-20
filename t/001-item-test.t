@@ -10,8 +10,10 @@ use DBI;
 
 BEGIN {
 	
+	$Class::Easy::DEBUG = 'immediately';
+	
 	use_ok 'DBI::Easy';
-	use_ok 'DBD::SQLite', 'we need DBD::SQLite for test';
+	use_ok 'DBD::SQLite';
 	
 	push @INC, 't', 't/DBI-Easy';
 	require 'db-config.pl';
@@ -96,6 +98,6 @@ $contact = $CONT->fetch_by_id ($contact->id, [qw(id value active)]);
 
 ok $contact->active;
 
-ok $contact->value eq 'apla@local';
+ok $contact->value eq 'apla@local', "contact value is: " . $contact->value;
 
 ok ! $contact->type, 'type defined and exists, but not fetched'; 

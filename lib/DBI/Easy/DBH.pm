@@ -29,6 +29,7 @@ sub no_fetch {
 	my $self = shift;
 	my $statement = shift;
 	my $params = shift;
+	my $seq = shift;
 	
 	$params = [defined $params ? $params : ()]
 		unless ref $params;
@@ -42,13 +43,18 @@ sub no_fetch {
 		
 		$sth->finish;
 		
-		$rows_affected = $dbh->last_insert_id (
-			undef,
-			undef,
-			$self->table,
-			$self->pri_key_column
-		)
-			if ! ref $statement and $statement =~ /^\s*insert/io;
+		if (! ref $statement and $statement =~ /^\s*insert/io) { 
+			if (defined $seq) {
+				$rows_affected = $self->fetch_single ("select ${seq}.currval as maxid from dual");
+			} else {
+				$rows_affected = $dbh->last_insert_id (
+					undef,
+					undef,
+					$self->table,
+					$self->_pk_column_
+				);
+			}
+		}
 		
 	};
 	

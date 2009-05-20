@@ -5,7 +5,7 @@ use Class::Easy;
 use DBI 1.601;
 
 use vars qw($VERSION);
-$VERSION = '0.05';
+$VERSION = '0.08';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -24,10 +24,14 @@ use DBI::Easy::DBH;
 
 use DBI::Easy::DriverPatcher;
 
+use DBI::Easy::Helper;
+
 # bwahahahaha
 our %GREP_COLUMN_INFO = qw(TYPE_NAME 1 mysql_values 1);
 
 our $wrapper = 1;
+
+our $H = 'DBI::Easy::Helper';
 
 sub new {
 	my $class  = shift;
@@ -243,9 +247,9 @@ sub _init_make_accessors {
 		make_accessor ($class, $field_name, is => 'rw');
 	}
 	
-	make_accessor ($class, 'pri_key', default => $pri_key);
-	make_accessor ($class, 'pri_key_column', default => $pri_key_column);
-	
+	make_accessor ($class, '_pk_', default => $pri_key);
+	make_accessor ($class, '_pk_column_', default => $pri_key_column);
+
 	return $class;
 }
 
@@ -336,13 +340,24 @@ sub _dbh_columns_info {
 	
 		my $t = timer ('primary key');
 		
+		# fuckin oracle
+		
+		my $schema;
+		
+		if ($class->dbh_vendor eq 'oracle') {
+			$schema = $dbh->selectall_arrayref (
+				'select user from dual'
+			)->[0]->[0];
+		}
+		
 		my $sth = $dbh->primary_key_info(
-			undef, undef, $table
+			undef, $schema, $table
 		);
 		
 		$t->lap ('execute');
 		
-		$sth->execute;
+		$sth->execute
+			unless $sth->{Executed};
 		
 		$t->lap ('fetchrow');
 
@@ -359,7 +374,7 @@ sub _dbh_columns_info {
 		$t->total;
 		
 		if ($real_row_count == 0) {
-			# warn "no primary keys for table '$table'";
+			warn "no primary keys for table '$table'";
 		}
 	};
 	
@@ -412,43 +427,62 @@ sub _prefix_manipulations {
 	
 	my $entities;
 	my $ent_key;
+	my $convert;
 	if ($dir eq 'fields2cols') {
 		$entities = $self->fields;
 		$ent_key = 'column_name';
+		$convert = 'value_to_type';
 	} elsif ($dir eq 'cols2fields') {
 		$entities = $self->cols;
 		$ent_key = 'field_name';
+		$convert = 'value_from_type';
 	} else {
 		die "you can't call _prefix_manipulations without direction";
 	}
-	
-	if ($in_place) {
-		map {
-			next
-				if /^:\w+/;
-			
-			my $ent = $entities->{$_};
-			#TODO
-			my $ent_type = $ent->{type_name};
-		
-			$values->{$ent->{$ent_key}} = delete $values->{$_}
-		} grep {
-			exists $entities->{$_} or /^:\w+/
-		} keys %$values;
-	} else {
-		my @defined_keys = grep {
-			exists $entities->{$_}
-				&& ($self->undef_as_null || defined $entities->{$_})
-		} keys %$values;
-		
-		my %defined = map {
-			$entities->{$_}->{$ent_key} => $values->{$_}
-		} @defined_keys;
-		
-		map {$defined{$_} = $values->{$_}} grep {/^:\w+/} keys %$values;
-		
-		return \%defined;
+
+	my $place = $values;
+	unless ($in_place) {
+		$place = {};
 	}
+	
+	foreach (keys %$values) {
+		
+		next unless exists $entities->{$_} or /^[_:-]\w+$/;
+			#&& ($self->undef_as_null || defined $entities->{$_})
+
+		if (/^:\w+$/) { # copy placeholders
+			unless ($in_place) {
+				$place->{$_} = $values->{$_};
+			}
+			next;
+		}
+		# next if $ent->{$ent_key} eq $_ and $in_place; # 
+		my ($prefix, $k) = (/^(_?)(\w+)$/);
+		$prefix = ''
+			unless defined $prefix;
+		
+		# debug $k, $_;
+		
+		my $ent = $entities->{$k};
+		my $value = $values->{$_};
+		
+		if ($in_place) {
+			delete $values->{$_};
+		}
+		
+		my $v = $H->$convert (
+			$ent->{type_name}, $value, $self
+		);
+		
+		next unless exists $ent->{$ent_key};
+		
+		# warn "$prefix/$ent_key => $ent->{$ent_key}";
+		$place->{$prefix . $ent->{$ent_key}} = $v;
+	}
+	
+	return $place
+		unless $in_place;
+	
 }
 
 sub fields_to_columns {

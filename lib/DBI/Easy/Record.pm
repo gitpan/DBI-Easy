@@ -1,5 +1,5 @@
 package DBI::Easy::Record;
-# $Id: Record.pm,v 1.13 2009/03/02 03:00:57 apla Exp $
+# $Id: Record.pm,v 1.4 2009/05/20 03:09:21 apla Exp $
 
 use Class::Easy;
 
@@ -13,7 +13,7 @@ has 'dump_fields_include', default => {}, is => 'rw', global => 1;
 sub _init {
 	my $self = shift;
 	
-	$self->{_fetched} = 0;
+	$self->{'+fetched'} = 0;
 	
 }
 
@@ -22,9 +22,9 @@ sub save {
 	
 	my $result;
 	
-	my $pk = $self->pri_key;
+	my $pk = $self->_pk_;
 	
-	if (($pk ne '' and $self->$pk) or $self->fetched) {
+	if (($pk and $pk ne '' and $self->$pk) or $self->fetched) {
 		# try to update
 		$result = $self->update;
 	} else {
@@ -33,7 +33,7 @@ sub save {
 }
 
 sub fetched {
-	return shift->{_fetched};
+	return shift->{'+fetched'};
 }
 
 # update by pk
@@ -73,7 +73,15 @@ sub create {
 	
 	$t->lap ('insert');
 	
-	my $id = $self->no_fetch ($sql, $bind);
+	# sequence is available for oracle insertions
+	my $pk_col = $self->_pk_column_;
+	my $seq;
+	
+	if ($pk_col and exists $fields->{"_$pk_col"} and $fields->{"_$pk_col"} =~ /^\s*(\w+)\.nextval\s*$/si) {
+		$seq = $1;
+	}
+
+	my $id = $self->no_fetch ($sql, $bind, $seq); 
 	
 	$t->lap ('perl wrapper for id');
 	
@@ -81,7 +89,7 @@ sub create {
 		return;
 	}
 	
-	my $pk = $self->pri_key;
+	my $pk = $self->_pk_;
 	
 	$self->$pk ($id);
 	
@@ -112,11 +120,7 @@ sub fetch {
 	
 	$record->columns_to_fields_in_place;
 	
-	$record->{_fetched} = 1;
-	
-	if ($record->can ('fetch_fixup')) {
-		$record->fetch_fixup;
-	}
+	$record->{'+fetched'} = 1;
 	
 	return $record;
 }
@@ -133,22 +137,6 @@ sub fetch_or_create {
 	}
 	
 	return $record;
-}
-
-# contains 'addresses', pack => 'My::Entity::Addresses::Collection', filter => ['account_id' => 'id'];
-
-sub has_one {
-	my $self   = shift;
-	my $params = shift;
-	
-	
-	
-	return $self->{_domains}
-		if $self->{_domains};
-	
-	$self->{_domains} = CETIS::Auction::Entity::Domain::Collection->new ({filter => {
-		account_id => $self->id,
-	}});
 }
 
 # example usage: $domain->is_related_to ('contacts', {
@@ -183,7 +171,7 @@ sub is_related_to {
 	$params{relation} = []
 		unless defined $params{relation};
 	
-	my $column     = $params{relation}->[0] || $ref->pri_key;
+	my $column     = $params{relation}->[0] || $ref->_pk_;
 	my $ref_column = $params{relation}->[1] || ($ref->prefix
 		? $ref->prefix
 		: $ref->table . '_'

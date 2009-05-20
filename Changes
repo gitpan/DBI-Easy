@@ -1,3 +1,24 @@
+2009-05-20	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.08
+
+	Added more support for Oracle:
+		Fix for pimary key info
+		Added support for fetch sequence currval after insert 
+			(because support for last_insert_id is unavailable)
+		
+	Now all fields prefixed with underscore treated as sql.
+		Bindings for these fields is available as sql named placeholders
+		Named placeholders converted to ? because lack of support in mysql
+	
+	All DATE, DATETIME and TIMESTAMP(?:\(\d+\))? fields automatically converted
+		before send to database and after fetch from database
+		Oracle suport is available only when developer manually sets NLS_DATE_FORMAT
+		
+	Time::Piece now required for installation
+	
+	Removed patches for old DBD::SQLite
+
 2009-05-04	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.05

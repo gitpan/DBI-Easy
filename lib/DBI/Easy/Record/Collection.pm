@@ -227,9 +227,9 @@ sub ordered_list {
 	my $sort_col;
 	if (exists $fields->{$order}) {
 		$sort_col = $fields->{$order}->{quoted_column_name};
-	} elsif ($self->pri_key) {
+	} elsif ($self->_pk_) {
 		# we assume primary key ordering unless ordered column known
-		$sort_col = $fields->{$self->pri_key}->{quoted_column_name};
+		$sort_col = $fields->{$self->_pk_}->{quoted_column_name};
 	}
 	
 	if ($dir =~ /^(asc|desc)$/i) {

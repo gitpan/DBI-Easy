@@ -11,7 +11,7 @@ use DBI;
 BEGIN {
 
 	use_ok 'DBI::Easy';
-	use_ok 'DBD::SQLite', 'we need DBD::SQLite for test';
+	use_ok 'DBD::SQLite';
 	
 	push @INC, 't', 't/DBI-Easy';
 	require 'db-config.pl';

@@ -1,5 +1,5 @@
 package DBI::Easy;
-# $Id: SQL.pm,v 1.16 2009/05/03 08:06:07 apla Exp $
+# $Id: SQL.pm,v 1.4 2009/05/20 03:09:21 apla Exp $
 
 use Class::Easy;
 
@@ -23,9 +23,10 @@ sub sql_range {
 	return join ', ', ('?') x $length;
 } 
 
-sub sql_names_range {
-	my $self = shift;
-	my $list = shift;
+sub sql_names_range { # now with AI
+	my $self   = shift;
+	my $list   = shift;
+	my $fields = shift;
 	
 	return join ', ', @$list;
 } 
@@ -53,6 +54,73 @@ sub sql_limit {
 	return "limit " . join ', ', @_;
 }
 
+sub sql_chunks_for_fields {
+	my $self = shift;
+	my $hash = shift;
+	my $mode = shift || 'where'; # also 'set' and 'insert'
+
+	my @sql;
+	my @bind;
+	
+	foreach my $k (keys %$hash) {
+		next if $k =~ /^\:/;
+		my $v = $hash->{$k};
+		
+		my $is_sql = 0;
+		if ($k =~ /^_(\w+)$/) { # when we get param as _param, then we interpret it as sql
+			$is_sql = 1;
+			$k = $1;
+		}
+		my $qk = $self->dbh->quote_identifier ($k);
+		
+		if (ref $v eq 'ARRAY') {
+			
+			die "can't use sql statement as arrayref"
+				if $is_sql;
+			
+			die "can't set/insert multiple values: " . join (', ', @$v)
+				unless $mode eq 'where';
+			
+			my $range;
+			if (! scalar @$v) {
+				$range = 'null';
+			} else {
+				$range = $self->sql_range ($v);
+			}
+			push @sql, qq($qk in ($range));
+			push @bind, @$v;
+		} elsif ($is_sql) {
+			my @ph;
+			my $re = '(^|[\=\,\s\(])(:\w+)([\=\,\s\)]|$)';
+			while ($v =~ /$re/gs) {
+				push @ph, $2;
+			}
+			
+			$v =~ s/$re/ \? /gs;
+			
+			if ($mode eq 'insert') {
+				push @{$sql[0]}, $qk;
+				push @{$sql[1]}, $v;
+			} else {
+				push @sql, qq($qk $v);
+			}
+			
+			push @bind, map {$hash->{$_}} @ph;
+		} else {
+			if ($mode eq 'insert') {
+				push @{$sql[0]}, $qk;
+				push @{$sql[1]}, '?';
+			} else {
+				push @sql, qq($qk = ?);
+			}
+
+			push @bind, $v;
+		}
+	}
+	
+	return \@sql, \@bind;
+}
+
 # get sql statement for insert
 
 sub sql_where {
@@ -73,47 +141,13 @@ sub sql_where {
 		return join (' and ', @where_acc), \@bind_acc;
 	}
 	
-    my @where;
-    my @bind;
-    
     return if ! defined $where_hash or $where_hash eq '';
     return $where_hash if !ref $where_hash;
     return if ref $where_hash ne 'HASH' || scalar keys %$where_hash == 0;
     
-	foreach my $k (keys %$where_hash) {
-		next if $k =~ /^\:/;
-		my $qk = $self->dbh->quote_identifier ($k);
-		my $v = $where_hash->{$k};
-		if (ref $where_hash->{$k} eq 'ARRAY') {
-			my $range;
-			if (! scalar @$v) {
-				$range = 'null';
-			} else {
-				$range = $self->sql_range ($v);
-			}
-			push @where, qq($qk in ($range));
-			push @bind, @$v;
-		} elsif ($v =~ /^\s*(<|<=|=>|>|!=|<>|<=>|like|between|not|is|regexp|rlike)\s/i) {
-			my @ph;
-			my $re = '(^|[\=\,\s\(])(:\w+)([\=\,\s\)]|$)';
-			while ($v =~ /$re/gs) {
-				push @ph, $2;
-			}
-			
-			$v =~ s/$re/ \? /gs;
-			
-			push @where, qq($qk $v);
-			
-			foreach (@ph) {
-				push @bind, $where_hash->{$_};
-			}
-		} else {
-			push @where, qq($qk = ?);
-			push @bind, $where_hash->{$k};
-		}
-	}
+    my ($where, $bind) = $self->sql_chunks_for_fields ($where_hash, 'where');
 
-	return join (' and ', @where), \@bind;
+	return join (' and ', @$where), $bind;
 }
 
 # Получаем список выражений для SET 
@@ -130,23 +164,16 @@ sub sql_set {
 		return;
 	}
 	
-	my @set;
-	my @bind;
+	my ($set, $bind) = $self->sql_chunks_for_fields ($param_hash, 'set');
 	
-	for my $k (keys %$param_hash) {
-		my $qk = $self->dbh->quote_identifier ($k);
-		push @set, qq($qk = ?);
-		push @bind, $param_hash->{$k};
-	}
-	
-	my $sql_set = join ', ', @set;
+	my $sql_set = join ', ', @$set;
 	
 	if (!defined $where_hash or ref($where_hash) !~ /HASH|ARRAY/) {
-		return ($sql_set, \@bind);
+		return ($sql_set, $bind);
 	} else {
 		my ($where_set, $bind_add) = $self->sql_where ($where_hash);
-		@bind = (@bind, @$bind_add);
-		return ($sql_set, \@bind, $where_set);
+		push @$bind, @$bind_add;
+		return ($sql_set, $bind, $where_set);
 	}
 }
 
@@ -156,14 +183,14 @@ sub sql_insert {
 	my $self = shift;
 	my $hash = shift || $self->fields;
 	
-	my $fields = [keys %$hash]; 
+	my ($set, $bind) = $self->sql_chunks_for_fields ($hash, 'insert');
 	
 	my $table_name = $self->table_quoted;
+	my $statement = "insert into $table_name (" .
+		join (', ', @{$set->[0]}) . ") values (" .
+		join (', ', @{$set->[1]}) . ")";
 	
-	my $placeholders = $self->sql_range ($fields);
-	my $field_set = $self->sql_names_range ($fields);
-	return "insert into $table_name ($field_set) values ($placeholders)",
-		[map {$hash->{$_}} @$fields];
+	return $statement, $bind;
 }
 
 sub sql_update {
@@ -209,8 +236,8 @@ sub sql_delete_by_pk {
 	my $where  = shift || {};
 	my $suffix = shift || '';
 	
-	my $pri_key_column = $self->pri_key_column;
-	my $where_hash = {%$where, $pri_key_column => $self->{$self->pri_key}};
+	my $_pk_column_ = $self->_pk_column_;
+	my $where_hash = {%$where, $_pk_column_ => $self->{$self->_pk_}};
 	
 	return $self->sql_delete ($where_hash, $suffix);
 	
@@ -222,8 +249,8 @@ sub sql_select_by_pk {
 	my $where  = shift;
 	my $suffix = shift || '';
 	
-	my $pri_key_column = $self->pri_key_column;
-	$where = {%$where, $pri_key_column => $self->{$self->pri_key}};
+	my $_pk_column_ = $self->_pk_column_;
+	$where = {%$where, $_pk_column_ => $self->{$self->_pk_}};
 	
 	return $self->sql_select ($where, $suffix);
 	
@@ -235,8 +262,8 @@ sub sql_update_by_pk {
 	my $suffix = shift || '';
 	
 	my $set_hash = $self->fields_to_columns;
-	my $pri_key_column = $self->pri_key_column;
-	my $where_hash = {%$where, $pri_key_column => $self->{$self->pri_key}};
+	my $_pk_column_ = $self->_pk_column_;
+	my $where_hash = {%$where, $_pk_column_ => $self->{$self->_pk_}};
 	
 	my ($sql, $bind) = $self->sql_update ($set_hash, $where_hash, $suffix);
 	

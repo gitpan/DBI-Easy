@@ -11,7 +11,7 @@ use DBI;
 BEGIN {
 
 	use_ok 'DBI::Easy';
-	use_ok 'DBD::SQLite', 'we need DBD::SQLite for test';
+	use_ok 'DBD::SQLite';
 	
 	push @INC, 't', 't/DBI-Easy';
 	require 'db-config.pl';
@@ -81,7 +81,7 @@ my $like_apla = $collection->list;
 
 ok @$like_apla == 2;
 
-$like_apla = $collection->list ({value => 'like :username', ':username' => 'apla%'});
+$like_apla = $collection->list ({_value => 'like :username', ':username' => 'apla%'});
 
 ok @$like_apla == 2, 'first like';
 
