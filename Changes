@@ -1,3 +1,12 @@
+2009-06-01	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.09
+	
+	Fix for oracle sequencers
+	
+	Added Helper package for various helping tasks
+
+
 2009-05-20	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.08

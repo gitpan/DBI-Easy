@@ -1,5 +1,5 @@
 package DBI::Easy::Record;
-# $Id: Record.pm,v 1.4 2009/05/20 03:09:21 apla Exp $
+# $Id: Record.pm,v 1.15 2009/05/20 02:26:24 apla Exp $
 
 use Class::Easy;
 

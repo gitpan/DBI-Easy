@@ -43,8 +43,9 @@ sub no_fetch {
 		
 		$sth->finish;
 		
-		if (! ref $statement and $statement =~ /^\s*insert/io) { 
+		if (! ref $statement and $statement =~ /^\s*insert/io and defined $rows_affected) { 
 			if (defined $seq) {
+				
 				$rows_affected = $self->fetch_single ("select ${seq}.currval as maxid from dual");
 			} else {
 				$rows_affected = $dbh->last_insert_id (

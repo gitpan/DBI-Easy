@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBI-Easy
-version:            0.08
+version:            0.09
 abstract:           ~
 author:
     - Ivan Baktsheev <dot.and.thing@gmail.com>

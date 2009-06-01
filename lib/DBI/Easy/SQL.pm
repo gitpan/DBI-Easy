@@ -1,5 +1,5 @@
 package DBI::Easy;
-# $Id: SQL.pm,v 1.4 2009/05/20 03:09:21 apla Exp $
+# $Id: SQL.pm,v 1.18 2009/05/20 02:28:02 apla Exp $
 
 use Class::Easy;
 

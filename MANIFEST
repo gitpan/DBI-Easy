@@ -5,6 +5,7 @@ lib/DBI/Easy/DriverPatcher.pm
 lib/DBI/Easy/Record.pm
 lib/DBI/Easy/SQL.pm
 lib/DBI/Easy/Record/Collection.pm
+lib/DBI/Easy/Helper.pm
 Makefile.PL
 MANIFEST
 META.yml			Module meta-data (added by MakeMaker)
