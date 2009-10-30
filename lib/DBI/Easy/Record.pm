@@ -91,7 +91,8 @@ sub create {
 	
 	my $pk = $self->_pk_;
 	
-	$self->$pk ($id);
+	$self->$pk ($id)
+		if $pk; # sometimes no primary keys in table
 	
 	$t->end;
 	

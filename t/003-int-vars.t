@@ -36,4 +36,7 @@ my $dumped_fields = $account->TO_JSON;
 
 ok scalar keys %$dumped_fields == 3;
 
+
+&finish_db;
+
 1;

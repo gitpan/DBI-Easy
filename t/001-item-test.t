@@ -100,4 +100,6 @@ ok $contact->active;
 
 ok $contact->value eq 'apla@local', "contact value is: " . $contact->value;
 
-ok ! $contact->type, 'type defined and exists, but not fetched'; 
+ok ! $contact->type, 'type defined and exists, but not fetched';
+
+&finish_db;

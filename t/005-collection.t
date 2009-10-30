@@ -139,5 +139,6 @@ diag '5 => ', join ', ', @$pager;
 #my $address2 = $account2->addresses->new_record ($address_fields);
 #$address2->save;
 
+&finish_db;
 1;
 

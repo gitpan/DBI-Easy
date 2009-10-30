@@ -86,4 +86,8 @@ sub init_db {
 	return $dbh;
 }
 
+sub finish_db {
+	unlink "db.sqlite";
+}
+
 1;

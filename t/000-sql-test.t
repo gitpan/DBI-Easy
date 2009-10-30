@@ -136,4 +136,6 @@ ok ($#$up_bind_values == 6);
 
 # diag $up_statement, Dumper $up_bind_values;
 
+&finish_db;
+
 1;

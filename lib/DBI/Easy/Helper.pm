@@ -35,7 +35,9 @@ sub _connector_maker {
 		my $table_name = '';
 		$table_name = "has 'table_name', default => '" . $params{table_name} . "';\n"
 			if $params{table_name};
-		$code = "package $pack;\nuse Class::Easy;\nuse base '$params{entity}';\n$table_name; package main;\nimport $pack;\n"
+		
+		$code = "package $pack;\nuse Class::Easy;\nuse base '$params{entity}';\n$table_name; package main;\nimport $pack;\n";
+		
 	} else {
 		warn "error: no entity package provided";
 		return;
