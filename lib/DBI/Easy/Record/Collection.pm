@@ -78,7 +78,7 @@ sub list {
 			
 			bless $rec, $self->record_package;
 			$rec->columns_to_fields_in_place;
-			$params{fetch_handler}->($rec);
+			return $params{fetch_handler}->($rec);
 		});
 		
 		

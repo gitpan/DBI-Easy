@@ -1,5 +1,5 @@
 package DBI::Easy;
-# $Id: SQL.pm,v 1.18 2009/05/20 02:28:02 apla Exp $
+# $Id: SQL.pm,v 1.6 2009/07/20 18:00:08 apla Exp $
 
 use Class::Easy;
 
@@ -8,6 +8,12 @@ use DBI;
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # sql generation stuff
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+our %BIND_TYPES = (
+	VARCHAR2 => {ora_type => 1},
+	CLOB => {ora_type => 112},
+	BLOB => {ora_type => 113}
+);
 
 sub sql_range {
 	my $self = shift;
@@ -71,7 +77,12 @@ sub sql_chunks_for_fields {
 			$is_sql = 1;
 			$k = $1;
 		}
+		
+		my $type = $self->columns->{$k}->{type_name};
+		
 		my $qk = $self->dbh->quote_identifier ($k);
+		$qk = $k
+			if $self->dbh_vendor eq 'oracle';
 		
 		if (ref $v eq 'ARRAY') {
 			
@@ -113,7 +124,9 @@ sub sql_chunks_for_fields {
 			} else {
 				push @sql, qq($qk = ?);
 			}
-
+			
+			$v = [$v, $type, $k]
+				if exists $BIND_TYPES{$type};
 			push @bind, $v;
 		}
 	}
@@ -309,6 +322,8 @@ sub sql_select {
 	my $cols_statement = $self->sql_column_list ($cols);
 	
 	my $table_name = $self->table_quoted;
+	$table_name = $self->table
+		if $self->dbh_vendor eq 'oracle';
 	
 	my $statement = "select $cols_statement from $table_name";
 	

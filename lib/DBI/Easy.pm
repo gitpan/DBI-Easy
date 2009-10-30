@@ -5,7 +5,7 @@ use Class::Easy;
 use DBI 1.601;
 
 use vars qw($VERSION);
-$VERSION = '0.09';
+$VERSION = '0.11';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -127,7 +127,9 @@ sub _init_class {
 	
 	make_accessor ($ref, 'is_collection', default => $is_collection);
 	
-	my $table_name = lc join ('_', split /(?=\p{IsUpper}\p{IsLower})/, $pack_chunks[-1]);
+	my $table_name = DBI::Easy::Helper::table_from_package ($pack_chunks[-1]);
+	$table_name = $self->table_name
+		if $self->can ('table_name');
 	
 	# dies when this method called without object reference;
 	# expected behaviour
@@ -264,7 +266,7 @@ sub _dbh_columns_info {
 
 	my $dbh = $class->dbh;
 
-	my $vendor = lc($dbh->get_info(17));
+	my $vendor = lc ($dbh->get_info(17));
 	
 	make_accessor ($class, 'dbh_vendor', default => $vendor);
 	
@@ -345,9 +347,7 @@ sub _dbh_columns_info {
 		my $schema;
 		
 		if ($class->dbh_vendor eq 'oracle') {
-			$schema = $dbh->selectall_arrayref (
-				'select user from dual'
-			)->[0]->[0];
+			$schema = uc $dbh->{Username};
 		}
 		
 		my $sth = $dbh->primary_key_info(

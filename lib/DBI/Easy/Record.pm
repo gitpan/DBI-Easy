@@ -1,5 +1,5 @@
 package DBI::Easy::Record;
-# $Id: Record.pm,v 1.15 2009/05/20 02:26:24 apla Exp $
+# $Id: Record.pm,v 1.6 2009/07/20 18:00:08 apla Exp $
 
 use Class::Easy;
 
@@ -85,9 +85,9 @@ sub create {
 	
 	$t->lap ('perl wrapper for id');
 	
-	unless ($id) {
-		return;
-	}
+	return unless defined $id;
+	
+	return $id if $id =~ /^0E\d+$/;
 	
 	my $pk = $self->_pk_;
 	
@@ -109,7 +109,7 @@ sub fetch {
 	
 	my ($statement, $bind) = $class->sql_select ($prefixed_params, undef, $cols);
 	
-	debug "sql: $statement";
+	debug "sql: '$statement'";
 	
 	my $record = $class->fetch_row ($statement, $bind);
 	

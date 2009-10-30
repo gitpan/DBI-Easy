@@ -24,6 +24,36 @@ sub statement {
 	return $sth;
 }
 
+sub bind_values {
+	my $self = shift;
+	my $sth  = shift;
+	my $bind = shift;
+	
+	foreach my $i (0 .. $#$bind) {
+		my $v = $bind->[$i];
+		my @bind_v = ($v);
+		if (ref $v eq 'ARRAY') {
+			die "you must supply bind type within \%DBI::Easy::BIND_TYPES"
+				unless exists $DBI::Easy::BIND_TYPES{$v->[1]};
+			
+			my $opts = $DBI::Easy::BIND_TYPES{$v->[1]};
+			
+			#if (exists $opts->{ora_type}) {
+			#	
+			#	warn Encode::is_utf8 ($v->[0]); 
+			#	$opts->{ora_csform} = 1;
+			#}
+			
+			$opts->{ora_field} = $v->[2];
+			
+			@bind_v = ($v->[0], $opts);
+			#use Data::Dumper;
+			#warn "bind for param ", $i + 1, ", for " . Dumper $opts;
+		}
+		$sth->bind_param ($i + 1, @bind_v);
+	}
+}
+
 # for every query except select we must use this routine
 sub no_fetch {
 	my $self = shift;
@@ -39,29 +69,35 @@ sub no_fetch {
 	
 	eval {
 		my $sth = $self->statement ($statement);
-		$rows_affected = $sth->execute(@$params);
-		
-		$sth->finish;
+		$self->bind_values ($sth, $params);
+
+		$rows_affected = $sth->execute;
+		# $sth->finish;
 		
 		if (! ref $statement and $statement =~ /^\s*insert/io and defined $rows_affected) { 
 			if (defined $seq) {
 				
 				$rows_affected = $self->fetch_single ("select ${seq}.currval as maxid from dual");
-			} else {
+
+			} elsif ($self->dbh_vendor ne 'oracle') {
 				$rows_affected = $dbh->last_insert_id (
 					undef,
 					undef,
 					$self->table,
 					$self->_pk_column_
 				);
+			} else {
+				# try to deal with return of pk id instead rows_affected
+				$rows_affected = "0E$rows_affected"; 
 			}
 		}
 		
 	};
 	
-	return 0 if $self->_dbh_error ($@);
+	return undef
+		if $self->_dbh_error ($@);
 	
-	return $rows_affected;
+	return $rows_affected || 0;
 }
 
 sub fetch_single {
@@ -78,8 +114,10 @@ sub fetch_single {
 	eval {
 		
 		my $sth = $self->statement ($statement);
+		
+		$self->bind_values ($sth, $params);
 
-		die unless $sth->execute(@$params);
+		die unless $sth->execute;
 		
 		$sth->bind_columns (\$single);
  
@@ -106,7 +144,8 @@ sub fetch_column {
 	eval {
 		my $sth = $dbh->prepare_cached($statement, {}, 3);
 
-		$sth->execute(@$params);
+		$self->bind_values ($sth, $params);
+		my $rows_affected = $sth->execute;
 
 		$sth->bind_columns(\$single);
  
@@ -134,7 +173,8 @@ sub fetch_columns {
 	eval {
 		my $sth = $dbh->prepare_cached($statement, {}, 3);
 
-		$sth->execute(@$params);
+		$self->bind_values ($sth, $params);
+		my $rows_affected = $sth->execute;
 
 		while (my @arr = $sth->fetchrow_array) {
 			foreach (0 .. $#arr) {
@@ -227,7 +267,8 @@ sub fetch_hashref {
 	eval {
 		my $sth = $self->statement ($statement);
 		
-		$rows_affected = $sth->execute (@$params);
+		$self->bind_values ($sth, $params);
+		$rows_affected = $sth->execute;
 		$result = $sth->fetchall_hashref($key);
 	};
 
@@ -253,7 +294,8 @@ sub fetch_arrayref {
 
 	eval {
 		my $sth = $self->statement ($statement);
-		$rows_affected = $sth->execute (@$params);
+		$self->bind_values ($sth, $params);
+		$rows_affected = $sth->execute;
 		$result = $sth->fetchall_arrayref ($sql_args->{Slice}, $sql_args->{MaxRows});
 	};
 
@@ -273,12 +315,18 @@ sub fetch_handled {
 	my $dbh = $self->dbh;
 	my $result;
 	my $rows_affected;
-
+	
+	my $failed = 0;
+	
 	eval {
 		my $sth = $self->statement ($statement);
-		$rows_affected = $sth->execute (@$params);
+		$self->bind_values ($sth, $params);
+		$rows_affected = $sth->execute;
 		while (my $row = $sth->fetchrow_hashref) {
-			&$fetch_handler ($row);
+			unless (defined &$fetch_handler ($row)) {
+				$failed = 1;
+				last;
+			}
 		}
 	};
 
