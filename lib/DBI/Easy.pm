@@ -5,7 +5,7 @@ use Class::Easy;
 use DBI 1.601;
 
 use vars qw($VERSION);
-$VERSION = '0.12';
+$VERSION = '0.13';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -315,9 +315,17 @@ sub _dbh_columns_info {
 					exists $GREP_COLUMN_INFO{$_}
 				} keys %$row),
 				
-				column_name => $column_name,
+				column_name        => $column_name,
 				quoted_column_name => $dbh->quote_identifier ($column_name),
+				nullable           => $row->{NULLABLE},
 			};
+			
+			my $default_val = $row->{COLUMN_DEF};
+			if (defined $default_val) {
+				$default_val =~ s/^"(.*)"$/$1/;
+				$column_info->{$column_name}->{default} = $default_val;
+			}
+			
 		}
 		
 		$t->end;
@@ -366,7 +374,9 @@ sub _dbh_columns_info {
 			# here we translate rows
 			my $pri_key_name = $row->{COLUMN_NAME};
 			
-			$column_info->{$row->{COLUMN_NAME}}->{X_IS_PK} = 1;
+			$column_info->{$row->{COLUMN_NAME}}->{X_IS_PK}  = 1;
+			$column_info->{$row->{COLUMN_NAME}}->{nullable} = 0;
+			
 		}
 		
 		$t->end;

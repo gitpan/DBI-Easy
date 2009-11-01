@@ -116,16 +116,16 @@ diag Dumper $collection->list;
 my $paging = {page_size => 20, count => 1000, page_num => 1, pages_to_show => 8};
 
 my $pager = $collection->pager ({%$paging, page_num => 1});
-diag '1 => ', join ', ', @$pager;
+diag '1 => ', join ', ', map {defined $_ ? $_ : '...'} @$pager;
 
 $pager = $collection->pager ({%$paging, page_num => 10});
-diag '10 => ', join ', ', @$pager;
+diag '10 => ', join ', ', map {defined $_ ? $_ : '...'} @$pager;
 
 $pager = $collection->pager ({%$paging, page_num => 3});
-diag '3 => ', join ', ', @$pager;
+diag '3 => ', join ', ', map {defined $_ ? $_ : '...'} @$pager;
 
 $pager = $collection->pager ({%$paging, page_num => 5});
-diag '5 => ', join ', ', @$pager;
+diag '5 => ', join ', ', map {defined $_ ? $_ : '...'} @$pager;
 
 
 # ok ! $collection->count ({contact_type => ''});

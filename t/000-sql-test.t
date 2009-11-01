@@ -47,9 +47,26 @@ my $sth = $dbh->column_info(
 	undef, undef, $table_name, '%'
 );
 
+#$sth->execute;
+#
+#my $column_info_h = $sth->fetchall_arrayref ({});
+#
+#diag Dumper $column_info_h;
+#
+#$sth = $dbh->column_info(
+#	undef, undef, $table_name, '%'
+#);
+
 my $easy = DBI::Easy->new;
 
-my $col_count = scalar keys %{$PKG->cols};
+my $col_state = $PKG->cols;
+
+my $col_count = scalar keys %$col_state;
+
+ok $col_state->{account_id}->{nullable} == 0;
+ok $col_state->{name}->{nullable} == 0;
+ok $col_state->{pass}->{nullable} == 0;
+ok $col_state->{pass}->{default}  eq 'abracadabra';
 
 ok $col_count and $col_count > 0;
 

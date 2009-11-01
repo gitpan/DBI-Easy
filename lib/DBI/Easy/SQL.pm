@@ -126,7 +126,8 @@ sub sql_chunks_for_fields {
 			}
 			
 			$v = [$v, $type, $k]
-				if exists $BIND_TYPES{$type};
+				if defined $type and exists $BIND_TYPES{$type};
+			
 			push @bind, $v;
 		}
 	}

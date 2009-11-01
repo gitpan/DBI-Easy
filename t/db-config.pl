@@ -40,8 +40,8 @@ sub init_db {
 	$dbh->do (qq[
 		create table account (
 			account_id $serial_type primary key $serial_suffix,
-			name text,
-			pass text,
+			name text not null,
+			pass text not null default "abracadabra",
 			meta text
 		);
 	]);
@@ -87,7 +87,8 @@ sub init_db {
 }
 
 sub finish_db {
-	unlink "db.sqlite";
+	unlink "db.sqlite"
+		unless $ENV{DEBUG};
 }
 
 1;

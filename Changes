@@ -1,3 +1,9 @@
+2009-11-01	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.13
+	
+	added nullable and default properties for column/field description
+
 2009-10-30	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.12
