@@ -287,22 +287,22 @@ sub sql_update_by_pk {
 
 sub sql_column_list {
 	my $self = shift;
-	my $fetch_fields = shift || $self->fetch_fields;
+	my $fieldset = shift || $self->fieldset;
 	
 	return '*'
-		if !defined $fetch_fields or !$fetch_fields;
+		if !defined $fieldset or !$fieldset;
 	
-	return $fetch_fields
-		unless ref $fetch_fields;
+	return $fieldset
+		unless ref $fieldset;
 	
 	die "can't recognize what you want, provide arrayref or string as fetch fields"
-		if ref $fetch_fields ne 'ARRAY' or ! scalar @$fetch_fields;
+		if ref $fieldset ne 'ARRAY' or ! scalar @$fieldset;
 	
 	my $col_list = [];
 	
 	my $fields = $self->fields;
 	
-	foreach my $field (@$fetch_fields) {
+	foreach my $field (@$fieldset) {
 		if (exists $fields->{$field}) {
 			push @$col_list, $fields->{$field}->{quoted_column_name};
 		} else {

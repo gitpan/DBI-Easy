@@ -93,6 +93,39 @@ sub list {
 	}
 }
 
+sub list_all {
+	my $self   = shift;
+	my $where  = shift || {};
+	my $suffix = shift || '';
+	my $bind_suffix = shift || [];
+	my %params = @_;
+	
+	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix);
+	
+	if ($params{fetch_handler} and ref $params{fetch_handler} eq 'CODE') {
+		
+		debug "fetch by record";
+		
+		$self->fetch_handled (@fetch_params, sub {
+			my $rec = shift;
+			
+			bless $rec, $self->record_package;
+			$rec->columns_to_fields_in_place;
+			return $params{fetch_handler}->($rec);
+		});
+		
+		
+	} else {
+		my $db_result = $self->fetch_arrayref (@fetch_params);
+		
+		debug "result count: ", $#$db_result+1;
+		
+		$self->columns_to_fields_in_place ($db_result);
+		
+		return $db_result;
+	}
+}
+
 sub update {
 	my $self   = shift;
 	

@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBI-Easy
-version:            0.13
+version:            0.14
 abstract:           ~
 author:
     - Ivan Baktsheev <dot.and.thing@gmail.com>
@@ -11,9 +11,9 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    Class::Easy:  0.02
+    Class::Easy:  0.05
     DBD::SQLite:  1.25
-    DBI:          1.601
+    DBI:          1.609
     Time::Piece:  0
 no_index:
     directory:

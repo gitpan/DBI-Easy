@@ -1,3 +1,10 @@
+2010-01-10	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.14
+	
+	reliable dump_fields_include
+	basic support for fieldset fetch support
+
 2009-11-01	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.13

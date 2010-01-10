@@ -1,6 +1,6 @@
 #!/usr/bin/perl -I../../../perl-easy/lib
 
-use strict;
+use Class::Easy;
 
 use Data::Dumper;
 
@@ -71,6 +71,20 @@ $contact->create;
 
 $count = $collection->count;
 ok $count == 2, "items in collection = $count";
+
+$collection->fieldset ([qw(value)]);
+
+my $emails = $collection->list ({type => 'email'});
+
+ok !exists $emails->[0]->{type};
+
+#$collection->register_fieldset ('emails', fields => [qw(email)]);
+#
+#$emails = $collection->list_emails ({type => 'email'});
+#
+#ok !exists $emails->[0]->{type};
+
+$collection->fieldset ('*');
 
 my $passport = $account->passport ({type => 'ABC', value => '123123123'});
 

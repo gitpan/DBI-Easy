@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use strict;
+use Class::Easy;
 
 use Data::Dumper;
 
@@ -60,7 +60,6 @@ $db_account = ref($account)->fetch_by_id ($account->id);
 
 ok !$db_account;
 
-
 #my $test_view = $PKG_VIEW->new ({user => 'apla', param => 'pam-pam'});
 #
 #warn Dumper $test_view->cols;
@@ -101,5 +100,13 @@ ok $contact->active;
 ok $contact->value eq 'apla@local', "contact value is: " . $contact->value;
 
 ok ! $contact->type, 'type defined and exists, but not fetched';
+
+make_accessor ($CONT, 'dump_fields_include', default => [qw(value type id)]);
+
+ok scalar keys %{$contact->TO_JSON} eq 2;
+
+#warn '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!';
+#warn Dumper $contact->TO_JSON;
+#warn '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!';
 
 &finish_db;

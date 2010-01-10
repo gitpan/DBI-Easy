@@ -8,8 +8,6 @@ use base qw(DBI::Easy);
 
 our $wrapper = 1;
 
-has 'dump_fields_include', default => {}, is => 'rw', global => 1;
-
 sub _init {
 	my $self = shift;
 	
@@ -248,7 +246,22 @@ sub dump_fields_exclude {
 sub TO_JSON {
 	my $self = shift;
 	
-	my $allowed = $self->dump_fields_include;
+	my $allowed = {};
+	
+	if ($self->can ('dump_fields_include')) {
+		my $pack_allowed = $self->dump_fields_include;
+		
+		# avoid shit
+		if (defined $pack_allowed and ref $pack_allowed) {
+
+			$allowed = {map {$_ => 1} @$pack_allowed}
+				if ref $pack_allowed eq 'ARRAY';
+			
+			$allowed = $pack_allowed
+				if ref $pack_allowed eq 'HASH';
+		}
+	}
+
 	if (scalar keys %$allowed) {
 		return {
 			map {$_ => $self->{$_}} 

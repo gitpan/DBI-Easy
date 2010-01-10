@@ -6,8 +6,8 @@ WriteMakefile(
 	'dist' => { COMPRESS=>"gzip", SUFFIX=>"gz" },
 	AUTHOR => 'Ivan Baktsheev <dot.and.thing@gmail.com>',
 	PREREQ_PM => {
-		'Class::Easy' => 0.02, # try_to_use support
-		'DBI'         => 1.601,
+		'Class::Easy' => 0.05, # try_to_use_quiet support
+		'DBI'         => 1.609,
 		'DBD::SQLite' => 1.25,
 		'Time::Piece' => 0,
 	}

@@ -2,10 +2,12 @@ package DBI::Easy;
 
 use Class::Easy;
 
-use DBI 1.601;
+use DBI 1.609;
+
+#use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.13';
+$VERSION = '0.14';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -139,7 +141,7 @@ sub _init_class {
 	make_accessor ($ref, 'prefix', is => 'rw', global => 1,
 		default => "${table_name}_");
 	
-	make_accessor ($ref, 'fetch_fields', is => 'rw', default => '*');
+	make_accessor ($ref, 'fieldset', is => 'rw', default => '*');
 	
 	make_accessor ($ref, 'prepare_method',  is => 'rw', global => 1,
 		default => 'prepare_cached');
@@ -390,8 +392,10 @@ sub _dbh_columns_info {
 	
 	return
 		if $class->_dbh_error ($@);
-	
+
 	$ts->end;
+	
+	#Hash::Util::lock_hash_recurse (%$column_info);
 	
 	return $column_info;
 }
