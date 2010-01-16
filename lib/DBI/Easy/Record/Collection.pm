@@ -44,7 +44,7 @@ sub make_sql_and_bind {
 	my @params = ([
 		$self->fields_to_columns ($filter),
 		$self->fields_to_columns ($where)
-	], $suffix);
+	], $suffix, undef, @_);
 	
 	if ($method eq 'sql_update') {
 		unshift @params, $self->fields_to_columns ($set);
@@ -67,40 +67,31 @@ sub list {
 	my $bind_suffix = shift || [];
 	my %params = @_;
 	
-	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix);
-	
-	if ($params{fetch_handler} and ref $params{fetch_handler} eq 'CODE') {
-		
-		debug "fetch by record";
-		
-		$self->fetch_handled (@fetch_params, sub {
-			my $rec = shift;
-			
-			bless $rec, $self->record_package;
-			$rec->columns_to_fields_in_place;
-			return $params{fetch_handler}->($rec);
-		});
-		
-		
-	} else {
-		my $db_result = $self->fetch_arrayref (@fetch_params);
-		
-		debug "result count: ", $#$db_result+1;
-		
-		$self->columns_to_fields_in_place ($db_result);
-		
-		return $db_result;
-	}
+	return $self->records (where => $where, suffix => [$suffix, @$bind_suffix], %params);
 }
 
-sub list_all {
+sub records {
 	my $self   = shift;
-	my $where  = shift || {};
-	my $suffix = shift || '';
-	my $bind_suffix = shift || [];
-	my %params = @_;
+	my $where;
+	my %params;
+
+	if (ref $_[0] and ref $_[0] eq 'HASH') {
+		$where = shift;
+		%params = @_;
+	} else {
+		%params = @_;
+		$where = $params{where} || {};
+	}
 	
-	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix);
+	my $suffix = '';
+	my $bind_suffix = [];
+	
+	if ($params{suffix} and ref $params{suffix} and ref $params{suffix} eq 'ARRAY') {
+		$suffix = shift @{$params{suffix}};
+		$bind_suffix = $params{suffix};
+	}
+	
+	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix, %params);
 	
 	if ($params{fetch_handler} and ref $params{fetch_handler} eq 'CODE') {
 		

@@ -83,7 +83,7 @@ sub no_fetch {
 				$rows_affected = $dbh->last_insert_id (
 					undef,
 					undef,
-					$self->table,
+					$self->table_name,
 					$self->_pk_column_
 				);
 			} else {

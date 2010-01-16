@@ -7,7 +7,7 @@ use DBI 1.609;
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -81,7 +81,7 @@ sub import {
 		die "can't use database class '$class' without db connection: $DBI::errstr"
 				if ! $class->dbh or $class->dbh eq '0E0';
 
-		die "can't retrieve table '".$class->table."' columns for '$class'"
+		die "can't retrieve table '".$class->table_name."' columns for '$class'"
 			unless $class->_init_make_accessors;
 		
 		$t->lap ("init_last $class");
@@ -130,16 +130,19 @@ sub _init_class {
 	make_accessor ($ref, 'is_collection', default => $is_collection);
 	
 	my $table_name = DBI::Easy::Helper::table_from_package ($pack_chunks[-1]);
-	$table_name = $self->table_name
-		if $self->can ('table_name');
 	
 	# dies when this method called without object reference;
 	# expected behaviour
 	
-	make_accessor ($ref, 'table', is => 'rw', global => 1,
-		default => $table_name);
-	make_accessor ($ref, 'prefix', is => 'rw', global => 1,
-		default => "${table_name}_");
+	my $common_table_prefix = '';
+	
+	$common_table_prefix = $ref->common_table_prefix
+		if $ref->can ('common_table_prefix');
+	
+	make_accessor ($ref, 'table_name', is => 'rw', global => 1, default => $common_table_prefix . $table_name)
+		unless $ref->can ('table_name');
+	make_accessor ($ref, 'column_prefix', is => 'rw', global => 1, default => "${table_name}_")
+		unless $ref->can ('column_prefix');
 	
 	make_accessor ($ref, 'fieldset', is => 'rw', default => '*');
 	
@@ -187,8 +190,8 @@ sub _init_collection {
 sub _init_make_accessors {
 	my $class = shift;
 	
-	my $table  = $class->table;
-	my $prefix = $class->prefix;
+	my $table_name    = $class->table_name;
+	my $column_prefix = $class->column_prefix;
 	
 	my $t = timer ('columns info wrapper');
 	
@@ -211,7 +214,7 @@ sub _init_make_accessors {
 		# here we translate rows
 		my $field_name = lc ($col_name); # oracle fix
 		
-		if (defined $prefix and $prefix ne '' and $col_name =~ /^$prefix(.*)/i) {
+		if (defined $column_prefix and $column_prefix ne '' and $col_name =~ /^$column_prefix(.*)/i) {
 			$field_name = lc($1);
 		}
 		
@@ -273,16 +276,18 @@ sub _dbh_columns_info {
 	make_accessor ($class, 'dbh_vendor', default => $vendor);
 	
 	if ($vendor eq 'oracle') {
-		$class->table (uc($class->table));
+		$class->table_name (uc($class->table_name));
 	}
 
-	my $table = $class->table;
+	my $table_name = $class->table_name;
 	
 	$ts->lap ('make accessor');
 	
 	# preparations
-	make_accessor ($class, 'table_quoted', 
-		default => $dbh->quote_identifier ($table));
+	make_accessor ($class, 'table_quoted', default =>
+		$vendor eq 'oracle'
+			? $table_name
+			: $dbh->quote_identifier ($table_name));
 	
 	my $real_row_count = 0;
 	
@@ -295,7 +300,7 @@ sub _dbh_columns_info {
 		my $t = timer ('column info call');
 		
 		my $sth = $dbh->column_info(
-			undef, undef, $table, '%'
+			undef, undef, $table_name, '%'
 		);
 		
 		$t->lap ('execute');
@@ -335,7 +340,7 @@ sub _dbh_columns_info {
 		$t->total;
 		
 		if ($real_row_count == 0) {
-			die "no rows for table '$table' fetched";
+			die "no rows for table '$table_name' fetched";
 		}
 	};
 	
@@ -361,7 +366,7 @@ sub _dbh_columns_info {
 		}
 		
 		my $sth = $dbh->primary_key_info(
-			undef, $schema, $table
+			undef, $schema, $table_name
 		);
 		
 		$t->lap ('execute');
@@ -386,7 +391,7 @@ sub _dbh_columns_info {
 		$t->total;
 		
 		if ($real_row_count == 0) {
-			warn "no primary keys for table '$table'";
+			warn "no primary keys for table '$table_name'";
 		}
 	};
 	
@@ -471,9 +476,9 @@ sub _prefix_manipulations {
 			next;
 		}
 		# next if $ent->{$ent_key} eq $_ and $in_place; # 
-		my ($prefix, $k) = (/^(_?)(\w+)$/);
-		$prefix = ''
-			unless defined $prefix;
+		my ($column_prefix, $k) = (/^(_?)(\w+)$/);
+		$column_prefix = ''
+			unless defined $column_prefix;
 		
 		# debug $k, $_;
 		
@@ -491,7 +496,7 @@ sub _prefix_manipulations {
 		next unless exists $ent->{$ent_key};
 		
 		# warn "$prefix/$ent_key => $ent->{$ent_key}";
-		$place->{$prefix . $ent->{$ent_key}} = $v;
+		$place->{$column_prefix . $ent->{$ent_key}} = $v;
 	}
 	
 	return $place

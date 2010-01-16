@@ -319,12 +319,56 @@ sub sql_select {
 	my $where  = shift;
 	my $suffix = shift || '';
 	my $cols   = shift;
+	my %params = @_;
 	
 	my $cols_statement = $self->sql_column_list ($cols);
+
+	# TODO: multiple condition/expression (group|order)_by
+
+	my $group_by = '';
+
+	if (defined $params{group_by}) {
+		
+		# try to translate field => column, and copy field if failed
+		my $group = $self->fields->{$params{group_by}}->{quoted_column_name};
+		$group = $params{group_by}
+			unless $group;
+		
+		$group_by = "group by $group"
+			if $group;
+	}
+	
+	my $order_by = '';
+
+	if (defined $params{sort_field}) {
+		
+		my $order_expr = $self->fields->{$params{sort_field}}->{quoted_column_name};
+		$order_expr = $params{sort_field}
+			unless $order_expr;
+		
+		my $order = $params{sort_order};
+		$order = 'desc' unless $order;
+		
+		$order_by = "order by $order_expr $order";
+	}
+	
+	my $limits = '';
+	
+	# parameter expansion here
+	if (defined $params{limit} and $params{limit} =~ /^(\d+)$/) {
+		# TODO: limit/offset by driver
+		# and SQL:2008 OFFSET start { ROW | ROWS }
+		# FETCH { FIRST | NEXT } [ count ] { ROW | ROWS } ONLY
+		$limits .= "limit $1";
+		if (defined $params{offset} and $params{offset} =~ /^(\d+)$/) {
+			$limits .= " offset $1";
+		}
+		
+		critical "you must use sort_(field|order) when you use limit/offset"
+			unless $order_by;
+	}
 	
 	my $table_name = $self->table_quoted;
-	$table_name = $self->table
-		if $self->dbh_vendor eq 'oracle';
 	
 	my $statement = "select $cols_statement from $table_name";
 	
@@ -342,7 +386,7 @@ sub sql_select {
 		if defined $where_statement and $where_statement !~ /^\s*$/;
 	
 	return
-		join (' ', $statement, $suffix),
+		join (' ', $statement, $group_by, $suffix, $order_by, $limits),
 		$bind;
 }
 

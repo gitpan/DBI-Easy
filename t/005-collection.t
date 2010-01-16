@@ -72,6 +72,13 @@ $contact->create;
 $count = $collection->count;
 ok $count == 2, "items in collection = $count";
 
+# very funny
+ok scalar @{$collection->records (sort_field => 'value', limit => 1)} == 1;
+
+$collection->fieldset ([qw(type)]);
+
+ok scalar @{$collection->records (group_by => 'type')} == 1;
+
 $collection->fieldset ([qw(value)]);
 
 my $emails = $collection->list ({type => 'email'});

@@ -32,7 +32,7 @@ use_ok $CONT;
 
 my $account = $ACC->new ({name => 'apla', meta => 'pam-pam'});
 
-my $table_name = $account->table;
+my $table_name = $account->table_name;
 
 ok ($table_name eq 'account');
 

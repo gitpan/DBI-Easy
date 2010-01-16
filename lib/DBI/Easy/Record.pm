@@ -171,14 +171,14 @@ sub is_related_to {
 		unless defined $params{relation};
 	
 	my $column     = $params{relation}->[0] || $ref->_pk_;
-	my $ref_column = $params{relation}->[1] || ($ref->prefix
-		? $ref->prefix
-		: $ref->table . '_'
+	my $ref_column = $params{relation}->[1] || ($ref->column_prefix
+		? $ref->column_prefix
+		: $ref->table_name . '_'
 	) . $column;
 	
 	try_to_use ($pack);
 	
-	# warn "column $column from table ".$ref->table." is related to column $ref_column from table ". $pack->table;
+	# warn "column $column from table ".$ref->table_name." is related to column $ref_column from table ". $pack->table_name;
 	
 	my $sub;
 	my $ref_sub;

@@ -1,3 +1,12 @@
+2010-01-16	Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.15
+	
+	minor fix
+	added parametrized group by, order by and limit/offset sql support
+	new collection method, 'records', to avoid noise of 'list'
+	
+
 2010-01-10	Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.14

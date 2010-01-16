@@ -15,8 +15,8 @@ sub init_db {
 	} elsif ($db eq 'mysql') {
 	
 		$ENV{DBI_DSN}  ||= 'DBI:mysql:database=perltests';
-		$ENV{DBI_USER} ||= 'apla';
-		$ENV{DBI_PASS} ||= 'bwahahah';
+		$ENV{DBI_USER} ||= '';
+		$ENV{DBI_PASS} ||= '';
 	
 	} elsif ($db eq 'sqlite') {
 

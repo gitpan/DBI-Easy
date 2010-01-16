@@ -40,7 +40,7 @@ ok $dbh ne '0E0', $dbh;
 
 my $test = $PKG->new ({name => 'aaa'});
 
-my $table_name = $test->table;
+my $table_name = $test->table_name;
 ok $table_name eq 'account', 'table name';
 
 my $sth = $dbh->column_info(
