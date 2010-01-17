@@ -7,6 +7,8 @@ use base qw(DBI::Easy::Record);
 
 use Class::Easy;
 
+has 'dump_fields_include', default => [qw(name id meta)]; # without password;
+
 sub _init_last {
 	my $self = shift;
 	
@@ -22,16 +24,9 @@ sub _init_last {
 		'passport', 'DBI::Easy::Test::Passport'
 	);
 	
-	$t->lap ('dump_fields_include');
-	
-	my $fields = $self->dump_fields_include ({
-		map {$_ => 1}
-			qw(name id meta) # without password;
-	});
-	
 	$t->end;
 	
-	return $fields;
+	return $self->dump_fields_include;
 }
 
 1;
