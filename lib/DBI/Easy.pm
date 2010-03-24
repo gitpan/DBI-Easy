@@ -7,7 +7,7 @@ use DBI 1.609;
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.16';
+$VERSION = '0.17';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -371,19 +371,21 @@ sub _dbh_columns_info {
 		
 		$t->lap ('execute');
 		
-		$sth->execute
-			unless $sth->{Executed};
+		if ($sth) {
+			$sth->execute
+				unless $sth->{Executed};
 		
-		$t->lap ('fetchrow');
+			$t->lap ('fetchrow');
 
-		while (my $row = $sth->fetchrow_hashref) {
-			$real_row_count ++;
-			# here we translate rows
-			my $pri_key_name = $row->{COLUMN_NAME};
+			while (my $row = $sth->fetchrow_hashref) {
+				$real_row_count ++;
+				# here we translate rows
+				my $pri_key_name = $row->{COLUMN_NAME};
 			
-			$column_info->{$row->{COLUMN_NAME}}->{X_IS_PK}  = 1;
-			$column_info->{$row->{COLUMN_NAME}}->{nullable} = 0;
+				$column_info->{$row->{COLUMN_NAME}}->{X_IS_PK}  = 1;
+				$column_info->{$row->{COLUMN_NAME}}->{nullable} = 0;
 			
+			}
 		}
 		
 		$t->end;
