@@ -33,7 +33,7 @@ sub _connector_maker {
 	
 	if ($params{entity}) {
 		my $table_name = '';
-		$table_name = "has 'table_name', default => '" . $params{table_name} . "';\n"
+		$table_name = "has 'table_name', global => 1, is => 'rw', default => '" . $params{table_name} . "';\n"
 			if $params{table_name};
 		
 		$code = "package $pack;\nuse Class::Easy;\nuse base '$params{entity}';\n$table_name; package main;\nimport $pack;\n";
@@ -71,9 +71,10 @@ sub value_from_type {
 	my $value = shift;
 	my $dbh   = shift; # check for driver
 	
-	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME')) {
+	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME' or $type eq 'TIMESTAMP')) {
 	
-		my $timestamp = eval {Time::Piece->strptime ($value, "%F %T")->epoch};
+		my $t = localtime;
+		my $timestamp = eval {(Time::Piece->strptime ($value, "%Y-%m-%d %H:%M:%S") - $t->tzoffset)->epoch};
 		return $timestamp
 			if $timestamp;
 	}
@@ -88,8 +89,8 @@ sub value_to_type {
 	my $value = shift;
 	my $dbh   = shift; # check for driver
 
-	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME')) {
-		my $timestamp = Time::Piece->new ($value)->strftime ("%F %T");
+	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME' or $type eq 'TIMESTAMP')) {
+		my $timestamp = Time::Piece->new ($value)->strftime ("%Y-%m-%d %H:%M:%S");
 		return $timestamp
 			if $timestamp;
 	}

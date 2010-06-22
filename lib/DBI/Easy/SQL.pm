@@ -10,7 +10,7 @@ use DBI;
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 our %BIND_TYPES = (
-	VARCHAR2 => {ora_type => 1},
+#	VARCHAR2 => {ora_type => 1},
 	CLOB => {ora_type => 112},
 	BLOB => {ora_type => 113}
 );
@@ -244,6 +244,28 @@ sub sql_delete {
 	debug $statement;
 	return $statement . ' ' . $suffix, $bind;
 }
+
+sub sql_truncate {
+	my $self = shift;
+	my $where_values = shift;
+	my $suffix = shift || '';
+	
+	my $table_name = $self->table_quoted;
+	
+	my ($where_statement, $bind)
+		= $self->sql_where ($where_values);
+	
+	my $statement = "delete from $table_name";
+	if (!$where_statement) {
+		warn "you can't delete all data from table, use delete_table_contents";
+		return;
+	}
+	
+	$statement .= " where $where_statement";
+	debug $statement;
+	return $statement . ' ' . $suffix, $bind;
+}
+
 
 sub sql_delete_by_pk {
 	my $self   = shift;

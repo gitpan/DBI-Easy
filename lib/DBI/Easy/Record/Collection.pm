@@ -147,13 +147,26 @@ sub delete {
 	my $self   = shift;
 	
 	my ($sql, $bind) = $self->make_sql_and_bind ('sql_delete', undef, @_);
-		
+	
 	my $db_result = $self->no_fetch ($sql, $bind);
 	
 	debug "result count: ", $db_result;
 	
 	return $db_result;
 }
+
+sub truncate {
+	my $self   = shift;
+	
+	my ($sql, $bind) = $self->make_sql_and_bind ('sql_truncate', undef, @_);
+	
+	my $db_result = $self->no_fetch ($sql, $bind);
+	
+	debug "result count: ", $db_result;
+	
+	return $db_result;
+}
+
 
 sub tree {
 	my $self   = shift;

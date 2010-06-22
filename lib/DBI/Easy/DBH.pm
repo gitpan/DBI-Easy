@@ -79,7 +79,7 @@ sub no_fetch {
 				
 				$rows_affected = $self->fetch_single ("select ${seq}.currval as maxid from dual");
 
-			} elsif ($self->dbh_vendor ne 'oracle') {
+			} elsif ($self->dbh_vendor ne 'oracle' and defined $self->_pk_) {
 				$rows_affected = $dbh->last_insert_id (
 					undef,
 					undef,

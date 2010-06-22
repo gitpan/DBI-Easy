@@ -2,12 +2,12 @@ package DBI::Easy;
 
 use Class::Easy;
 
-use DBI 1.609;
+use DBI 1.611;
 
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.17';
+$VERSION = '0.18';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -141,7 +141,7 @@ sub _init_class {
 	
 	make_accessor ($ref, 'table_name', is => 'rw', global => 1, default => $common_table_prefix . $table_name)
 		unless $ref->can ('table_name');
-	make_accessor ($ref, 'column_prefix', is => 'rw', global => 1, default => "${table_name}_")
+	make_accessor ($ref, 'column_prefix', is => 'rw', global => 1, default => $ref->table_name . "_")
 		unless $ref->can ('column_prefix');
 	
 	make_accessor ($ref, 'fieldset', is => 'rw', default => '*');
@@ -243,12 +243,15 @@ sub _init_make_accessors {
 				$pri_key_column = $col_name;
 			} 
 			
-			make_accessor ($class, "fetch_by_$field_name", default => sub {
+			my $fetch_by_pk_sub = sub {
 				my $package = shift;
 				my $value   = shift;
 				
 				return $package->fetch ({$field_name => $value}, @_);
-			});
+			};
+			
+			make_accessor ($class, "fetch_by_$field_name", default => $fetch_by_pk_sub);
+			make_accessor ($class, "fetch_by_pk",          default => $fetch_by_pk_sub);
 		}
 		
 		make_accessor ($class, $field_name, is => 'rw');
@@ -277,6 +280,7 @@ sub _dbh_columns_info {
 	
 	if ($vendor eq 'oracle') {
 		$class->table_name (uc($class->table_name));
+		# make_accessor ($class, 'table_name', is => 'rw', global => 1, default => uc($class->table_name));
 	}
 
 	my $table_name = $class->table_name;
@@ -417,17 +421,17 @@ sub _dbh_error {
 	my @caller = caller (1);
 	my @caller2 = caller (2);
 	
-	warn ("[db error at $caller[3] ($caller[2]) called at $caller2[3] ($caller2[2])] ",
-		$error
-	);
+	if ($DBI::Easy::ERRHANDLER and ref $DBI::Easy::ERRHANDLER eq 'CODE') {
+		&$DBI::Easy::ERRHANDLER ($self, $error, $statement);
+	} else {
+		warn ("[db error at $caller[3] ($caller[2]) called at $caller2[3] ($caller2[2])] ",
+			$error
+		);
+	}
 	
 	if ($self->{in_transaction}) {
 		eval {$self->rollback};
 		die $error;
-	}
-	
-	if ($DBI::Easy::ERRHANDLER and ref $DBI::Easy::ERRHANDLER eq 'CODE') {
-		&$DBI::Easy::ERRHANDLER ($self, $error, $statement);
 	}
 	
 	return 1;
