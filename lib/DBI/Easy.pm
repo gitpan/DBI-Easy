@@ -7,7 +7,7 @@ use DBI 1.611;
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.18';
+$VERSION = '0.19';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -55,9 +55,12 @@ sub import {
 	no strict 'refs';
 	no warnings 'once';
 	
-	make_accessor ($class, 'dbh', is => 'rw', global => 1)
-		unless ${"${class}::imported"};
-	
+	unless (${"${class}::imported"}) {
+		make_accessor ($class, 'dbh', is => 'rw', global => 1);
+		make_accessor ($class, 'dbh_modify', is => 'rw', global => 1, default => sub {
+			return shift->dbh;
+		});
+	}
 
 	if (! ${"${class}::wrapper"} and $class ne __PACKAGE__ and ! ${"${class}::imported"} ) {
 		
@@ -495,9 +498,13 @@ sub _prefix_manipulations {
 			delete $values->{$_};
 		}
 		
-		my $v = $H->$convert (
-			$ent->{type_name}, $value, $self
-		);
+		my $v = $value;
+		
+		if ($column_prefix eq '_') {
+			$v = $H->$convert (
+				$ent->{type_name}, $value, $self
+			);
+		}
 		
 		next unless exists $ent->{$ent_key};
 		

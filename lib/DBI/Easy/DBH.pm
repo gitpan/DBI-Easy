@@ -5,10 +5,11 @@ package DBI::Easy;
 use Class::Easy;
 
 sub statement {
-	my $self      = shift;
-	my $statement = shift;
+	my $self       = shift;
+	my $statement  = shift;
+	my $dbh_method = shift || 'dbh';
 	
-	my $dbh = $self->dbh;
+	my $dbh = $self->$dbh_method;
 	
 	my $sth;
 	if (ref $statement eq 'DBI::st') {
@@ -64,11 +65,13 @@ sub no_fetch {
 	$params = [defined $params ? $params : ()]
 		unless ref $params;
 	
-	my $dbh = $self->dbh;
+	my $dbh_method = 'dbh_modify';
+	
+	my $dbh = $self->dbh_modify;
 	my $rows_affected;
 	
 	eval {
-		my $sth = $self->statement ($statement);
+		my $sth = $self->statement ($statement, $dbh_method);
 		$self->bind_values ($sth, $params);
 
 		$rows_affected = $sth->execute;
