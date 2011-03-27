@@ -7,7 +7,7 @@ use DBI 1.611;
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.19';
+$VERSION = '0.21';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -94,7 +94,8 @@ sub import {
 		$t->end;
 		
 		# my $driver = $class->dbh->get_info (17);
-		# warn "driver name from get_info ($DBI::Const::GetInfoType{SQL_DBMS_NAME}): $driver";
+		# warn "driver name from
+		# get_info ($DBI::Const::GetInfoType{SQL_DBMS_NAME}): $driver";
 	}
 	
 	${"${class}::imported"} = 1;
@@ -142,10 +143,15 @@ sub _init_class {
 	$common_table_prefix = $ref->common_table_prefix
 		if $ref->can ('common_table_prefix');
 	
-	make_accessor ($ref, 'table_name', is => 'rw', global => 1, default => $common_table_prefix . $table_name)
-		unless $ref->can ('table_name');
-	make_accessor ($ref, 'column_prefix', is => 'rw', global => 1, default => $ref->table_name . "_")
-		unless $ref->can ('column_prefix');
+	make_accessor (
+		$ref, 'table_name', is => 'rw', global => 1,
+		default => $common_table_prefix . $table_name
+	) unless $ref->can ('table_name');
+	
+	make_accessor (
+		$ref, 'column_prefix', is => 'rw', global => 1,
+		default => $ref->table_name . "_"
+	) unless $ref->can ('column_prefix');
 	
 	make_accessor ($ref, 'fieldset', is => 'rw', default => '*');
 	
@@ -173,19 +179,39 @@ sub _init_collection {
 		$rec_pkg = join '::', @pack_chunks;
 		
 		# TODO: move to Class::Easy
-		my $count = eval ("scalar grep {!/\\w+\:\:/} keys \%$rec_pkg\::;")
-			+ eval ("scalar keys \%$rec_pkg\::Record\::;");
-		
-		unless ($count) {
-			unless (try_to_use ($rec_pkg)) {
-				warn $@;
-				$rec_pkg = join '::', @pack_chunks, 'Record';
-				die unless (try_to_use ($rec_pkg));
-			}
+		unless (try_to_use ($rec_pkg)) {
+			die unless try_to_use ($rec_pkg . '::Record');
 		}
 		
 		$self->record_package ($rec_pkg);
 	}
+	
+}
+
+sub _detect_vendor {
+	my $class = shift;
+	
+	my $dbh = $class->dbh;
+	
+	my $vendor = lc ($dbh->get_info(17));
+	
+	make_accessor ($class, 'dbh_vendor', default => $vendor);
+	
+	my $vendor_pack = "DBI::Easy::Vendor::$vendor";
+	my $have_vendor_pack = try_to_use_quiet ($vendor_pack);
+	
+	unless ($have_vendor_pack) {
+		$vendor_pack = "DBI::Easy::Vendor::Base";
+		die unless try_to_use_quiet ($vendor_pack);
+	}
+	
+	no strict 'refs';
+	
+	push @{"$class\::ISA"}, $vendor_pack;
+	
+	use strict 'refs';
+	
+	$class->_init_vendor;
 	
 }
 
@@ -195,6 +221,9 @@ sub _init_make_accessors {
 	
 	my $table_name    = $class->table_name;
 	my $column_prefix = $class->column_prefix;
+	
+	# detecting vendor
+	$class->_detect_vendor;
 	
 	my $t = timer ('columns info wrapper');
 	
@@ -217,7 +246,11 @@ sub _init_make_accessors {
 		# here we translate rows
 		my $field_name = lc ($col_name); # oracle fix
 		
-		if (defined $column_prefix and $column_prefix ne '' and $col_name =~ /^$column_prefix(.*)/i) {
+		if (
+			defined $column_prefix
+			and $column_prefix ne ''
+			and $col_name =~ /^$column_prefix(.*)/i
+		) {
 			$field_name = lc($1);
 		}
 		
@@ -277,24 +310,15 @@ sub _dbh_columns_info {
 
 	my $dbh = $class->dbh;
 
-	my $vendor = lc ($dbh->get_info(17));
-	
-	make_accessor ($class, 'dbh_vendor', default => $vendor);
-	
-	if ($vendor eq 'oracle') {
-		$class->table_name (uc($class->table_name));
-		# make_accessor ($class, 'table_name', is => 'rw', global => 1, default => uc($class->table_name));
-	}
-
 	my $table_name = $class->table_name;
 	
 	$ts->lap ('make accessor');
 	
 	# preparations
-	make_accessor ($class, 'table_quoted', default =>
-		$vendor eq 'oracle'
-			? $table_name
-			: $dbh->quote_identifier ($table_name));
+	make_accessor (
+		$class, 'table_quoted',
+		default => $class->quote_identifier ($table_name)
+	);
 	
 	my $real_row_count = 0;
 	
@@ -365,12 +389,7 @@ sub _dbh_columns_info {
 		my $t = timer ('primary key');
 		
 		# fuckin oracle
-		
-		my $schema;
-		
-		if ($class->dbh_vendor eq 'oracle') {
-			$schema = uc $dbh->{Username};
-		}
+		my $schema = $class->vendor_schema;
 		
 		my $sth = $dbh->primary_key_info(
 			undef, $schema, $table_name
@@ -500,7 +519,8 @@ sub _prefix_manipulations {
 		
 		my $v = $value;
 		
-		if ($column_prefix eq '_') {
+		# we must convert only convertible values
+		if ($column_prefix eq '') {
 			$v = $H->$convert (
 				$ent->{type_name}, $value, $self
 			);
@@ -625,8 +645,9 @@ acquire DBI::Easy::Record[::Collection] or one of the child classes.
 	use DBI;
 	use DBI::Easy::Record;
 	use base qw(DBI::Easy::Record);
-	sub dbh {		# optional. You don't have to write a procedure similar to this one since
-					# DBI->connect is requested when a ready $dbh hasn't been provided
+	sub dbh {		# optional. You don't have to write a procedure similar
+					# to this one since DBI->connect is requested
+					# when a ready $dbh hasn't been provided
 		return DBI->connect;
 	};
 	1;

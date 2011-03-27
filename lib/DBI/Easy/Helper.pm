@@ -27,16 +27,21 @@ sub _connector_maker {
 	
 	# check for existing package
 	return $pack
-		if eval "scalar keys \%$pack\::;";
+		if try_to_use_inc_quiet ($pack);
 	
 	my $code;
+
 	
 	if ($params{entity}) {
 		my $table_name = '';
 		$table_name = "has 'table_name', global => 1, is => 'rw', default => '" . $params{table_name} . "';\n"
 			if $params{table_name};
+
+		my $column_prefix = '';
+		$column_prefix = "has 'column_prefix', global => 1, is => 'rw', default => '" . $params{column_prefix} . "';\n"
+			if $params{column_prefix};
 		
-		$code = "package $pack;\nuse Class::Easy;\nuse base '$params{entity}';\n$table_name; package main;\nimport $pack;\n";
+		$code = "package $pack;\nuse Class::Easy;\nuse base '$params{entity}';\n$table_name$column_prefix\npackage main;\nimport $pack;\n";
 		
 	} else {
 		warn "error: no entity package provided";

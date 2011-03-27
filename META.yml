@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBI-Easy
-version:            0.19
+version:            0.21
 abstract:           ~
 author:
     - Ivan Baktsheev <dot.and.thing@gmail.com>
@@ -11,9 +11,9 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    Class::Easy:  0.11
+    Class::Easy:  0.13
     DBD::SQLite:  1.25
-    DBI:          1.609
+    DBI:          1.611
     Time::Piece:  0
 resources:
     bugtracker:  http://rt.cpan.org/NoAuth/Bugs.html?Dist=DBI-Easy

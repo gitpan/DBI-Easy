@@ -15,8 +15,8 @@ WriteMakefile(
 		},
 	},
 	PREREQ_PM => {
-		'Class::Easy' => "0.11", # try_to_use_quiet support
-		'DBI'         => "1.609",
+		'Class::Easy' => "0.13",
+		'DBI'         => "1.611",
 		'DBD::SQLite' => "1.25",
 		'Time::Piece' => 0,
 	}

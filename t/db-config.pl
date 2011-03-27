@@ -1,10 +1,40 @@
 #!/usr/bin/perl
 
+use Class::Easy;
+
+sub record_for {
+	my $name = shift;
+	my $prefix = shift || '';
+	
+	DBI::Easy::Helper->r (
+		$name,
+		prefix => 'Local::DBI::Easy',
+		entity => "Local::DBI::Easy::${prefix}Entity"
+	);
+}
+
+sub collection_for {
+	my $name = shift;
+	my $prefix = shift || '';
+	
+	DBI::Easy::Helper->r (
+		$name,
+		prefix => 'Local::DBI::Easy',
+		entity => "Local::DBI::Easy::${prefix}Entity"
+	);
+	
+	DBI::Easy::Helper->c (
+		$name,
+		prefix => 'Local::DBI::Easy',
+		entity => "Local::DBI::Easy::${prefix}Entity::Collection"
+	);
+}
+
 sub init_db {
 	
 	unlink "db.sqlite";
 
-	my $db = 'sqlite';
+	my $db = $ENV{DBD} || 'sqlite';
 	
 	if ($db eq 'pg') {
 	
@@ -26,7 +56,7 @@ sub init_db {
 	
 	}
 	
-	my $dbh = DBI->connect;
+	$::dbh = DBI->connect;
 	
 	my $serial_type = 'integer';
 	my $serial_suffix = 'autoincrement';
@@ -35,9 +65,9 @@ sub init_db {
 		$serial_suffix = ''; # 'auto_increment';
 	}
 	
-	$dbh->do ('drop table if exists account');
+	$::dbh->do ('drop table if exists account');
 	# without prefix
-	$dbh->do (qq[
+	$::dbh->do (qq[
 		create table account (
 			account_id $serial_type primary key $serial_suffix,
 			name text not null,
@@ -48,8 +78,8 @@ sub init_db {
 	
 	# prefixed
 	
-	$dbh->do ('drop table if exists contact');
-	$dbh->do (qq[create table contact (
+	$::dbh->do ('drop table if exists contact');
+	$::dbh->do (qq[create table contact (
 			contact_id $serial_type primary key $serial_suffix,
 			contact_type text,
 			contact_value text,
@@ -58,8 +88,8 @@ sub init_db {
 		);
 	]);
 	
-	$dbh->do ('drop table if exists passport');
-	$dbh->do (qq[create table passport (
+	$::dbh->do ('drop table if exists passport');
+	$::dbh->do (qq[create table passport (
 			id $serial_type primary key $serial_suffix,
 			passport_type text,
 			passport_value text,
@@ -67,8 +97,8 @@ sub init_db {
 		);
 	]);
 
-	$dbh->do ('drop table if exists address');
-	$dbh->do (qq[create table address (
+	$::dbh->do ('drop table if exists address');
+	$::dbh->do (qq[create table address (
 			address_id $serial_type primary key $serial_suffix,
 			address_country text,
 			address_city text,
@@ -76,19 +106,100 @@ sub init_db {
 		);
 	]);
 	
-	$dbh->do ('drop table if exists account_address');
-	$dbh->do (qq[create table account_address (
+	$::dbh->do ('drop table if exists account_address');
+	$::dbh->do (qq[create table account_address (
 			account_id integer not null,
 			address_id integer not null
 		);
 	]);
 	
-	return $dbh;
+	$::dbh->do ('drop table if exists smf_users');
+	# without prefix
+	$::dbh->do (qq[
+		create table smf_users (
+			id_user $serial_type primary key $serial_suffix,
+			name text not null,
+			pass text not null default "abracadabra",
+			meta text
+		);
+	]);
+	
+	
+	return $::dbh;
 }
 
 sub finish_db {
 	unlink "db.sqlite"
 		unless $ENV{DEBUG};
+}
+
+1;
+
+
+package Local::DBI::Easy::Entity;
+
+use Class::Easy;
+
+use base qw(DBI::Easy::Record);
+
+our $wrapper = 1;
+
+sub _init_db {
+	my $self = shift;
+	
+	$self->dbh ($::dbh);
+}
+
+1;
+
+package Local::DBI::Easy::Entity::Collection;
+
+use Class::Easy;
+
+use base qw(DBI::Easy::Record::Collection);
+
+our $wrapper = 1;
+
+sub _init_db {
+	my $self = shift;
+	
+	$self->dbh ($::dbh);
+}
+
+1;
+
+package Local::DBI::Easy::ForumEntity;
+
+use Class::Easy;
+
+use base qw(DBI::Easy::Record);
+
+our $wrapper = 1;
+
+sub common_table_prefix {'smf_'}
+
+sub _init_db {
+	my $self = shift;
+	
+	$self->dbh ($::dbh);
+}
+
+1;
+
+package Local::DBI::Easy::ForumEntity::Collection;
+
+use Class::Easy;
+
+use base qw(DBI::Easy::Record::Collection);
+
+our $wrapper = 1;
+
+sub common_table_prefix {'smf_'}
+
+sub _init_db {
+	my $self = shift;
+	
+	$self->dbh ($::dbh);
 }
 
 1;

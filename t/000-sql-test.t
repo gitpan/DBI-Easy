@@ -8,6 +8,8 @@ use Test::More qw(no_plan);
 
 use DBI;
 
+use Class::Easy;
+
 BEGIN {
 	
 	use_ok 'DBI::Easy';
@@ -18,12 +20,6 @@ BEGIN {
 	require 'db-config.pl';
 	
 	my $dbh = &init_db;
-	
-	DBI::Easy->dbh ($dbh);
-	
-	use_ok 'DBI::Easy::Test::Account';
-	use_ok 'DBI::Easy::Test::Account::Collection';
-	
 };
 
 my $values = {
@@ -32,13 +28,20 @@ my $values = {
 	meta => 'pam-pam'
 };
 
-my $PKG  = 'DBI::Easy::Test::Account';
+my $a_record = record_for ('account');
+my $a_collection = collection_for ('account');
 
-my $dbh = $PKG->dbh;
+ok try_to_use ('Local::DBI::Easy::Account::Collection');
+ok ! try_to_use_inc ('Local::DBI::Easy::Account::Collection');
+
+my $a_record_smf = record_for ('users', 'Forum');
+my $a_collection_smf = collection_for ('users', 'Forum');
+
+my $dbh = $a_record->dbh;
 
 ok $dbh ne '0E0', $dbh;
 
-my $test = $PKG->new ({name => 'aaa'});
+my $test = $a_record->new ({name => 'aaa'});
 
 my $table_name = $test->table_name;
 ok $table_name eq 'account', 'table name';
@@ -57,9 +60,10 @@ my $sth = $dbh->column_info(
 #	undef, undef, $table_name, '%'
 #);
 
+DBI::Easy->dbh ($::dbh);
 my $easy = DBI::Easy->new;
 
-my $col_state = $PKG->cols;
+my $col_state = $a_record->columns;
 
 my $col_count = scalar keys %$col_state;
 
@@ -68,7 +72,7 @@ ok $col_state->{name}->{nullable} == 0;
 ok $col_state->{pass}->{nullable} == 0;
 ok $col_state->{pass}->{default}  eq 'abracadabra';
 
-ok $col_count and $col_count > 0;
+ok ($col_count and ($col_count > 0));
 
 my $column_info_array = $easy->fetch_arrayref ($sth);
 
@@ -101,15 +105,12 @@ my $q = $dbh->quote_identifier ('test');
 ok $sql_part =~ /$q like ?/;
 ok $values_list->[-1] eq 'test_value_111';
 
-diag $sql_part;
-diag join ', ', @$values_list;
+# diag $sql_part;
+# diag join ', ', @$values_list;
 
 ($sql_part, $values_list) = $test->sql_where ($values);
 
-diag Dumper $values_list;
-
-
-
+# diag Dumper $values_list;
 
 
 my @params_list = split (/\sand\s/, $sql_part);
@@ -122,7 +123,7 @@ foreach my $counter (0 .. $#params_list) {
 		$values->{$unquoted_param} . ' != ' . $values_list->[$counter];
 }
 
-diag $sql_part, " '", join ("', '", @$values_list), "'\n";
+# diag $sql_part, " '", join ("', '", @$values_list), "'\n";
 
 my ($ins_statement, $ins_bind_values) = $test->sql_insert ($values);
 
@@ -130,20 +131,26 @@ ok ($ins_statement =~ /insert into [^\s]+ \((?:\S+(?:, )?)+\) values \(\?/);
 
 # diag $ins_statement, Dumper $ins_bind_values;
 
-my ($up_statement, $up_bind_values) = $test->sql_update ($values);
+my ($up_statement, $up_bind_values) = $test->sql_update (set => $values);
 
-ok ($up_statement =~ /update \S+ set (?:\S+\s\=\s\?)+/);
-ok ($up_statement !~ /where/);
+# diag $up_statement, $up_bind_values;
 
-($up_statement, $up_bind_values) = $test->sql_update ($values, {active => 1});
+ok (!defined ($up_statement), 'update_all');
 
-diag $up_statement;
+#ok ($up_statement =~ /update \S+ set (?:\S+\s\=\s\?)+/);
+#ok ($up_statement !~ /where/);
+
+($up_statement, $up_bind_values) = $test->sql_update (
+	set => $values, where => {active => 1}
+);
+
+# diag $up_statement;
 
 ok ($up_statement =~ /update \S+ set (?:\S+\s\=\s\?)+/);
 ok ($up_statement =~ /where \Sactive/);
 
 ($up_statement, $up_bind_values) = $test->sql_update (
-	$values, {active => 1, option => [20, 30, 40]}
+	set => $values, where => {active => 1, option => [20, 30, 40]}
 );
 
 ok ($up_statement =~ /update \S+ set (?:\S+\s\=\s\?)+/);
@@ -152,6 +159,12 @@ ok ($up_statement =~ /option\S in \(\?, \?, \?\)/);
 ok ($#$up_bind_values == 6);
 
 # diag $up_statement, Dumper $up_bind_values;
+
+my $test_smf = $a_record_smf->new ({name => 'aaa'});
+
+($ins_statement, $ins_bind_values) = $test_smf->sql_insert ($values);
+
+ok ($ins_statement =~ /insert into \Wsmf_users\W \((?:\S+(?:, )?)+\) values \(\?/);
 
 &finish_db;
 

@@ -27,30 +27,56 @@ sub natural_join {
 }
 
 sub make_sql_and_bind {
-	my $self = shift;
+	my $self   = shift;
 	my $method = shift;
-	my $set    = shift;
-	my $where  = shift || {};
-	my $suffix = shift || '';
+	
+	my $set;
+	my $where  = {};
+	my $suffix = '';
+	my $bind_suffix;
+	
+	my %args;
+	
+	# legacy syntax
+	if (! defined $_[0] or ref $_[0]) {
+		$set    = shift;
+		$where  = shift || {};
+		$suffix = shift || '';
 
-	my $bind_suffix = shift;
-	
-	my $ref = ref $self;
-	
-	my $_where = {};
+		$bind_suffix = shift;
+		%args = (@_);
+	} else {
+		%args        = (@_);
+		$where       = delete $args{where} || {};
+		$set         = delete $args{set};
+		$suffix      = delete $args{suffix} || '';
+		$bind_suffix = delete $args{bind};
+	}
+
+	# if we call collection method from package name, we must create collection
+	# object automatically
+	$self = $self->new
+		unless ref $self;
 	
 	my $filter = $self->filter;
 	
-	my @params = ([
-		$self->fields_to_columns ($filter),
-		$self->fields_to_columns ($where)
-	], $suffix, undef, @_);
+	my %params = (
+		where => [
+			$self->fields_to_columns ($filter),
+			$self->fields_to_columns ($where)
+		],
+		suffix => $suffix,
+		%args
+	);
 	
 	if ($method eq 'sql_update') {
-		unshift @params, $self->fields_to_columns ($set);
+		$params{set} = $self->fields_to_columns ($set);
 	}
 	
-	my ($select, $bind) = $self->$method (@params);
+#	use Data::Dumper;
+#	warn "$method => " . Dumper \%params;
+	
+	my ($select, $bind) = $self->$method (%params);
 	
 	push @$bind, @{$bind_suffix || []};
 	
@@ -60,6 +86,7 @@ sub make_sql_and_bind {
 	
 }
 
+# legacy
 sub list {
 	my $self   = shift;
 	my $where  = shift || {};
@@ -75,20 +102,20 @@ sub records {
 	my $where;
 	my %params;
 
-	if (ref $_[0] and ref $_[0] eq 'HASH') {
+	if (ref $_[0]) {
 		$where = shift;
-		%params = @_;
+		%params = (@_);
 	} else {
-		%params = @_;
-		$where = $params{where} || {};
+		%params = (@_);
+		$where = delete $params{where} || {};
 	}
 	
 	my $suffix = '';
 	my $bind_suffix = [];
 	
 	if ($params{suffix} and ref $params{suffix} and ref $params{suffix} eq 'ARRAY') {
-		$suffix = shift @{$params{suffix}};
-		$bind_suffix = $params{suffix};
+		$suffix = shift @{$params{suffix}} || '';
+		$bind_suffix = delete $params{suffix};
 	}
 	
 	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix, %params);
@@ -124,7 +151,7 @@ sub update {
 		
 	my $db_result = $self->no_fetch ($sql, $bind);
 	
-	debug "result count: ", $db_result;
+	debug "rows affected: ", $db_result;
 	
 	return $db_result;
 }
@@ -133,7 +160,14 @@ sub update {
 sub count {
 	my $self   = shift;
 	
-	my ($select, $bind) = $self->make_sql_and_bind ('sql_select_count', undef, @_);
+	my ($select, $bind);
+	
+	if (ref $_[0] or @_ % 2) { # make_sql_and_bind (set, where, suffix, bind)
+		($select, $bind) = $self->make_sql_and_bind ('sql_select_count', undef, @_);
+		
+	} else { # make_sql_and_bind (set => set, where => where, ...)
+		($select, $bind) = $self->make_sql_and_bind ('sql_select_count', @_);
+	}
 	
 	my $db_result = $self->fetch_single ($select, $bind);
 	
@@ -146,27 +180,21 @@ sub count {
 sub delete {
 	my $self   = shift;
 	
-	my ($sql, $bind) = $self->make_sql_and_bind ('sql_delete', undef, @_);
+	my ($select, $bind);
 	
-	my $db_result = $self->no_fetch ($sql, $bind);
+	if (ref $_[0] or @_ % 2) { # make_sql_and_bind (set, where, suffix, bind)
+		($select, $bind) = $self->make_sql_and_bind ('sql_delete', undef, @_);
+		
+	} else { # make_sql_and_bind (set => set, where => where, ...)
+		($select, $bind) = $self->make_sql_and_bind ('sql_delete', @_);
+	}
+		
+	my $db_result = $self->no_fetch ($select, $bind);
 	
-	debug "result count: ", $db_result;
-	
-	return $db_result;
-}
-
-sub truncate {
-	my $self   = shift;
-	
-	my ($sql, $bind) = $self->make_sql_and_bind ('sql_truncate', undef, @_);
-	
-	my $db_result = $self->no_fetch ($sql, $bind);
-	
-	debug "result count: ", $db_result;
+	debug "rows affected: ", $db_result;
 	
 	return $db_result;
 }
-
 
 sub tree {
 	my $self   = shift;
@@ -311,8 +339,6 @@ sub ordered_list {
 		total_count => $count,
 		version => 1,
 	};
-	
-	
 }
 
 # page_size, count, page_num, pages_to_show

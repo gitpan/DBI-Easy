@@ -209,9 +209,26 @@ sub sql_insert {
 
 sub sql_update {
 	my $self = shift;
-	my $set_values = shift;
-	my $where_values = shift;
-	my $suffix = shift || '';
+	my $set_values;
+	my $where_values;
+	my $suffix = '';
+	my $update_all = 0;
+	
+	my $params;
+	
+	if (ref $_[0]) {
+		$set_values = shift;
+		$where_values = shift;
+		$suffix = shift || '';
+	} else {
+		$params = {@_};
+		$set_values   = $params->{set};
+		$where_values = $params->{where};
+		$suffix       = $params->{suffix} || '';
+		$update_all   = $params->{all};
+	}
+	
+	return if ! $update_all and ! defined $where_values;
 	
 	my $table_name = $self->table_quoted;
 	
@@ -221,6 +238,7 @@ sub sql_update {
 	my $statement = "update $table_name set $set_statement";
 	$statement .= " where $where_statement"
 		if $where_statement;
+	
 	return $statement . ' ' . $suffix, $bind;
 }
 
@@ -245,28 +263,6 @@ sub sql_delete {
 	return $statement . ' ' . $suffix, $bind;
 }
 
-sub sql_truncate {
-	my $self = shift;
-	my $where_values = shift;
-	my $suffix = shift || '';
-	
-	my $table_name = $self->table_quoted;
-	
-	my ($where_statement, $bind)
-		= $self->sql_where ($where_values);
-	
-	my $statement = "delete from $table_name";
-	if (!$where_statement) {
-		warn "you can't delete all data from table, use delete_table_contents";
-		return;
-	}
-	
-	$statement .= " where $where_statement";
-	debug $statement;
-	return $statement . ' ' . $suffix, $bind;
-}
-
-
 sub sql_delete_by_pk {
 	my $self   = shift;
 	my $where  = shift || {};
@@ -282,13 +278,19 @@ sub sql_delete_by_pk {
 
 sub sql_select_by_pk {
 	my $self   = shift;
-	my $where  = shift;
-	my $suffix = shift || '';
+	my %params = @_;
+	
+	my $where = {};
+	
+	if ($params{where}) {
+		$where = delete $params{where};
+	}
 	
 	my $_pk_column_ = $self->_pk_column_;
-	$where = {%$where, $_pk_column_ => $self->{$self->_pk_}};
 	
-	return $self->sql_select ($where, $suffix);
+	return $self->sql_select (where => [
+		$where, $_pk_column_ => $self->{$self->_pk_}
+	], %params);
 	
 }
 
@@ -338,12 +340,24 @@ sub sql_column_list {
 
 sub sql_select {
 	my $self   = shift;
-	my $where  = shift;
-	my $suffix = shift || '';
-	my $cols   = shift;
-	my %params = @_;
 	
-	my $cols_statement = $self->sql_column_list ($cols);
+	my %params = (@_);
+	
+	my $where  = $params{where} || {};
+	my $suffix = $params{suffix} || '';
+	my $fieldset = $params{fieldset};
+	
+	my $fieldset_method = $params{fieldset_name};
+	
+	if (defined $fieldset and defined $fieldset_method) {
+		critical "you must use only fieldset with field names/expressions or fieldset_name for method who return fieldset";
+	}
+	
+	if (defined $fieldset_method) {
+		$fieldset = $self->$fieldset_method;
+	}
+	
+	my $cols_statement = $self->sql_column_list ($fieldset);
 
 	# TODO: multiple condition/expression (group|order)_by
 
@@ -414,10 +428,24 @@ sub sql_select {
 
 sub sql_select_count {
 	my $self   = shift;
-	my $where  = shift;
-	my $suffix = shift || '';
+
+	my $where  = {};
+	my $suffix = '';
 	
-	return $self->sql_select ($where, $suffix, 'count(*)');
+	my %params;
+	
+	if (ref $_[0]) {
+		$where = shift;
+		if (@_ % 2) {
+			$suffix = shift;
+		}
+		%params = (@_);
+	} else {
+		%params = (@_);
+		$where = $params{where} || {};
+	}
+	
+	return $self->sql_select (where => $where, suffix => $suffix, %params, fieldset => 'count(*)');
 	
 }
 

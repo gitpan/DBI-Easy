@@ -17,25 +17,7 @@ BEGIN {
 	
 	my $dbh = &init_db;
 	
-	DBI::Easy->dbh ($dbh);
-	
-	use_ok 'DBI::Easy::Test::Account';
 };
-
-my $account = DBI::Easy::Test::Account->new (
-	{name => 'apla', meta => 'metainfo', pass => 'dsfasdfasdf'}
-);
-
-$account->create;
-
-ok $account;
-
-my $dumped_fields = $account->TO_JSON;
-
-
-
-ok scalar keys %$dumped_fields == 3;
-
 
 &finish_db;
 

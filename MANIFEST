@@ -6,6 +6,10 @@ lib/DBI/Easy/Record.pm
 lib/DBI/Easy/SQL.pm
 lib/DBI/Easy/Record/Collection.pm
 lib/DBI/Easy/Helper.pm
+lib/DBI/Easy/Vendor/Base.pm
+lib/DBI/Easy/Vendor/oracle.pm
+lib/DBI/Easy/Vendor/postgresql.pm
+lib/DBI/Easy/Vendor/mysql.pm
 Makefile.PL
 MANIFEST
 META.yml			Module meta-data (added by MakeMaker)
@@ -17,9 +21,3 @@ t/003-int-vars.t
 t/004-speed.t
 t/005-collection.t
 t/db-config.pl
-t/DBI/Easy/Test/Account/Collection.pm
-t/DBI/Easy/Test/Contact/Collection.pm
-t/DBI/Easy/Test/Account.pm
-t/DBI/Easy/Test/Address.pm
-t/DBI/Easy/Test/Contact.pm
-t/DBI/Easy/Test/Passport.pm

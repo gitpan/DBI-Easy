@@ -69,6 +69,8 @@ sub create {
 	
 	my ($sql, $bind) = $self->sql_insert ($fields);
 	
+	debug "sql: $sql, bind: [\"", join ('", "', @$bind), '"';
+
 	$t->lap ('insert');
 	
 	# sequence is available for oracle insertions
@@ -104,9 +106,11 @@ sub fetch {
 	my $params  = shift;
 	my $cols    = shift;
 	
-	my $prefixed_params = $class->fields_to_columns ($params);
+	my $prefixed_params;
+	$prefixed_params = $class->fields_to_columns ($params)
+		if defined $params;
 	
-	my ($statement, $bind) = $class->sql_select ($prefixed_params, undef, $cols);
+	my ($statement, $bind) = $class->sql_select (where => $prefixed_params, fieldset => $cols);
 	
 	debug "sql: '$statement'";
 	
