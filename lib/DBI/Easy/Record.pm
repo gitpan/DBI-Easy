@@ -9,10 +9,18 @@ use base qw(DBI::Easy);
 our $wrapper = 1;
 
 sub _init {
-	my $self = shift;
+	my $class = shift;
 	
-	$self->{'+fetched'} = 0;
+	my $params;
 	
+	if (@_ == 1 && ref $_[0] && ref $_[0] eq 'HASH') {
+		# old school
+		$params->{field_values} = $_[0];
+	} else {
+		$params = {@_};
+	}
+	
+	return $params;
 }
 
 sub save {
@@ -20,34 +28,61 @@ sub save {
 	
 	my $result;
 	
-	my $pk = $self->_pk_;
+	return unless $self->field_values;
 	
-	if (($pk and $pk ne '' and $self->$pk) or $self->fetched) {
+	my $pk_column = $self->_pk_column_;
+	
+	if ($pk_column and $pk_column ne '' and defined $self->column_values and $self->column_values->{$pk_column}) {
 		# try to update
-		$result = $self->update;
+		$result = $self->update_by_pk;
 	} else {
 		$result = $self->create;
 	}
+	
+	return $result;
 }
 
 sub fetched {
-	return shift->{'+fetched'};
+	return 1 if defined shift->{field_values};
 }
 
 # update by pk
-sub update {
-	my $self = shift;
+sub update_by_pk {
+	my $self   = shift;
+	my %params = @_;
 	
-	my ($sql, $bind) = $self->sql_update_by_pk (@_);
+	# there we make decision:
+	# a) programmmer can provide update values
+	#    we simply reject field values
+	# b) field_values already contains update values
+	
+	my $column_values;
+	
+	if (exists $params{set} and ref $params{set} and ref $params{set} eq 'HASH') {
+		$column_values = $self->fields_to_columns ($params{set});
+	} else {
+		$column_values = $self->fields_to_columns;
+	}
+	
+	my ($sql, $bind) = $self->sql_update_by_pk (%params);
+	
+	return unless defined $sql;
 	
 	debug "sql: $sql => " . (defined $bind and scalar @$bind ? join ', ', @$bind : '[]');
 	
-	return $self->no_fetch ($sql, $bind);
+	my $result = $self->no_fetch ($sql, $bind);
 	
+	foreach my $k (keys %$column_values) {
+		$self->column_values->{$k} = $column_values->{$k};
+	}
+
+	delete $self->{field_values};
+	
+	return $result
 }
 
 # delete by pk
-sub delete {
+sub delete_by_pk {
 	my $self = shift;
 	
 	my ($sql, $bind) = $self->sql_delete_by_pk (@_);
@@ -63,21 +98,21 @@ sub create {
 	
 	my $t = timer ('fields to columns translation');
 	
-	my $fields = $self->fields_to_columns;
+	my $column_values = $self->fields_to_columns;
 	
 	$t->lap ('sql generation');
 	
-	my ($sql, $bind) = $self->sql_insert ($fields);
+	my ($sql, $bind) = $self->sql_insert ($column_values);
 	
-	debug "sql: $sql, bind: [\"", join ('", "', @$bind), '"';
-
+	debug "sql: $sql => " . (defined $bind and scalar @$bind ? join ', ', @$bind : '[]');
+	
 	$t->lap ('insert');
 	
 	# sequence is available for oracle insertions
 	my $pk_col = $self->_pk_column_;
 	my $seq;
 	
-	if ($pk_col and exists $fields->{"_$pk_col"} and $fields->{"_$pk_col"} =~ /^\s*(\w+)\.nextval\s*$/si) {
+	if ($pk_col and exists $column_values->{"_$pk_col"} and $column_values->{"_$pk_col"} =~ /^\s*(\w+)\.nextval\s*$/si) {
 		$seq = $1;
 	}
 
@@ -87,13 +122,14 @@ sub create {
 	
 	return unless defined $id;
 	
+	delete $self->{field_values};
+	$self->{column_values} = $column_values;
+	
 	return $id if $id =~ /^0E\d+$/;
 	
-	my $pk = $self->_pk_;
-	
-	$self->$pk ($id)
-		if $pk; # sometimes no primary keys in table
-	
+	$self->{column_values}->{$pk_col} = $id
+		if $pk_col; # sometimes no primary keys in table
+
 	$t->end;
 	
 	$t->total;
@@ -106,9 +142,7 @@ sub fetch {
 	my $params  = shift;
 	my $cols    = shift;
 	
-	my $prefixed_params;
-	$prefixed_params = $class->fields_to_columns ($params)
-		if defined $params;
+	my $prefixed_params = $class->fields_to_columns ($params);
 	
 	my ($statement, $bind) = $class->sql_select (where => $prefixed_params, fieldset => $cols);
 	
@@ -119,13 +153,10 @@ sub fetch {
 	return
 		unless ref $record;
 	
-	bless $record, $class;
+	return $class->new (
+		column_values => $record
+	);
 	
-	$record->columns_to_fields_in_place;
-	
-	$record->{'+fetched'} = 1;
-	
-	return $record;
 }
 
 sub fetch_or_create {
@@ -140,6 +171,52 @@ sub fetch_or_create {
 	}
 	
 	return $record;
+}
+
+sub hash {
+	my $self = shift;
+	
+	my $result = {};
+	
+	# we need to return everything we got from db + changes
+	my $result = {map {$_ => $self->{field_values}->{$_}}
+		grep {defined $self->{field_values}->{$_}}
+		keys %{$self->fields}};
+	
+	foreach my $col_name (keys %{$self->{column_values}}) {
+		my $col_meta = $self->columns->{$col_name};
+		my $col_value = $self->{column_values}->{$col_name};
+		
+		next unless defined $col_value;
+		
+		$result->{$col_name} = $col_value, next
+			if ! defined $col_meta and ! exists $result->{$col_meta->{field_name}};
+		
+		$result->{$col_meta->{field_name}} = (
+			exists $col_meta->{decoder} ? $col_meta->{decoder}->(): $col_value
+		) if ! exists $result->{$col_meta->{field_name}};
+	}
+	
+	return {%{$self->{embed}}, %$result};
+}
+
+*TO_JSON = \&hash;
+*TO_XML  = \&hash;
+
+sub embed {
+	my $self = shift;
+	my $what = shift;
+	
+	if (@_ == 1) {
+		die "cannot embed '$what' into ". ref $self
+			if exists $self->fields->{$what};
+		$self->{embed}->{$what} = $_[0];
+	} elsif (@_ > 1) {
+		die "too many parameters";
+	}
+	
+	return $self->{embed}->{$what};
+	
 }
 
 # example usage: $domain->is_related_to ('contacts', {
@@ -245,36 +322,6 @@ sub validation_errors {
 
 sub dump_fields_exclude {
 	 #TODO
-}
-
-sub TO_JSON {
-	my $self = shift;
-	
-	my $allowed = {};
-	
-	if ($self->can ('dump_fields_include')) {
-		my $pack_allowed = $self->dump_fields_include;
-		
-		# avoid shit
-		if (defined $pack_allowed and ref $pack_allowed) {
-
-			$allowed = {map {$_ => 1} @$pack_allowed}
-				if ref $pack_allowed eq 'ARRAY';
-			
-			$allowed = $pack_allowed
-				if ref $pack_allowed eq 'HASH';
-		}
-	}
-
-	if (scalar keys %$allowed) {
-		return {
-			map {$_ => $self->{$_}} 
-			grep {exists $allowed->{$_}} 
-			keys %$self
-		};
-	} else {
-		return {%$self};
-	}
 }
 
 sub apply_request_params {

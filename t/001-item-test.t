@@ -39,18 +39,65 @@ ok ($account->meta eq 'pam-pam', 'table test finished');
 
 $account->save;
 
+# test for 'meta' field cleanup after save
+ok ! defined $account->field_values;
+
 ok $account->id;
 
 $account->meta ('pam-pam-pam');
 
 ok $account->save;
 
+# test for 'meta' field cleanup after save
+ok ! defined $account->field_values;
+
 # test for account id change
 my $acc_id = $account->id;
+
+# warn Dumper $account->hash;
+
+my $values_hash = $account->hash;
+
+ok $values_hash->{id} == $acc_id;
+ok $values_hash->{name} eq 'apla';
+ok $values_hash->{meta} eq 'pam-pam-pam';
+
+ok scalar keys %$values_hash == 3;
+
+ok scalar keys %{$account->TO_JSON} == 3;
+ok scalar keys %{$account->TO_XML} == 3;
+
+$account->id (1000000);
+
+ok $account->id == 1000000;
+
+$account->_raw_id (1000001);
+
+ok $account->id == 1000001;
+
+$account->embed (xxx => 'yyy');
+
+$values_hash = $account->hash;
+
+ok $values_hash->{id} == 1000001;
+
+ok $values_hash->{xxx} eq 'yyy';
+
+# todo: date test
+
+ok $account->_fetched_id eq $acc_id;
+
+$account->update_by_pk;
 
 my $db_account = ref($account)->fetch_by_id ($account->id);
 
 ok $db_account->meta eq 'pam-pam-pam', 'update by pk test';
+
+ok $db_account->delete_by_pk;
+
+$db_account = ref($account)->fetch_by_id ($account->id);
+
+ok !$db_account;
 
 #my $test_view = $PKG_VIEW->new ({user => 'apla', param => 'pam-pam'});
 #

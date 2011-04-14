@@ -129,6 +129,8 @@ ok $collection3->count == 2;
 ok @{$collection3->list ({type => 'email'})} == 2;
 ok $collection3->count ({type => 'email'}) == 2;
 
+ok @{$collection->list ({_contact_value => ' like ?'}, undef, ['apla%'])} == 2;
+
 my $address_fields = {line => 'test str', city => 'usecase', country => 'testania'};
 
 # WTF?
@@ -163,12 +165,23 @@ ok $#{$coll_a->list} == 1;
 
 ok $#{$coll_a->list ({_name => 'like "apl%"'})} == 0;
 
+my $list_of_hashes = $coll_a->list_of_record_hashes ({_name => 'like "apl%"'});
+
+# warn Dumper $list_of_hashes;
+
+ok ref $list_of_hashes->[0] eq 'HASH';
+
+ok $list_of_hashes->[0]->{pass} eq 'abracadabra';
+
+ok keys %{$list_of_hashes->[0]} == 3;
+
 ok $coll_a->count ({_name => 'like "apl%"'}) == 1;
 
 ok $coll_a->count (where => {_name => 'like "apl%"'}) == 1;
 
 # ok ! $collection->count ({contact_type => ''});
 
+ok $coll_a->delete (where => {_name => 'like "apl%"'}) == 1;
 
 #my $items = $collection->
 

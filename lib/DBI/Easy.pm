@@ -7,7 +7,7 @@ use DBI 1.611;
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.21';
+$VERSION = '0.22';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -37,23 +37,23 @@ our $H = 'DBI::Easy::Helper';
 
 sub new {
 	my $class  = shift;
-	my $params = shift;
 	
-	$params ||= {};
-
+	my $params;
+	my $init_params;
+	
+	$init_params = $class->_init (@_)
+		if $class->can ('_init');
+	
+	$params = $init_params || {(@_ == 1 && ref $_[0] && ref $_[0] eq 'HASH')
+		? %{$_[0]}
+		: @_
+	};
+	
 	bless $params, $class;
-	
-	$params->_init
-		if $params->can ('_init');
-	
-	return $params;
 }
 
 sub import {
 	my $class = shift;
-	
-	no strict 'refs';
-	no warnings 'once';
 	
 	unless (${"${class}::imported"}) {
 		make_accessor ($class, 'dbh', is => 'rw', global => 1);
@@ -148,6 +148,8 @@ sub _init_class {
 		default => $common_table_prefix . $table_name
 	) unless $ref->can ('table_name');
 	
+	make_accessor ($ref, '_date_format', is => 'rw', global => 1);
+	
 	make_accessor (
 		$ref, 'column_prefix', is => 'rw', global => 1,
 		default => $ref->table_name . "_"
@@ -161,7 +163,7 @@ sub _init_class {
 		default => 3);
 	make_accessor ($ref, 'undef_as_null', is => 'rw', global => 1,
 		default => 0);
-
+		
 }
 
 sub _init_collection {
@@ -227,22 +229,23 @@ sub _init_make_accessors {
 	
 	my $t = timer ('columns info wrapper');
 	
-	my $cols = $class->_dbh_columns_info;
+	my $columns = $class->_dbh_columns_info;
 	
 	$t->end;
 	
-	make_accessor ($class, 'cols', default => $cols);
-	make_accessor ($class, 'columns', default => $cols);
+	make_accessor ($class, 'columns', default => $columns);
+	make_accessor ($class, 'column_values', is => 'rw');
 	
 	my $fields = {};
 	
 	make_accessor ($class, 'fields', default => $fields);
+	make_accessor ($class, 'field_values', is => 'rw');
 	
 	my $pri_key;
 	my $pri_key_column;
 	
-	foreach my $col_name (keys %$cols) {
-		my $col_meta = $cols->{$col_name};
+	foreach my $col_name (keys %$columns) {
+		my $col_meta = $columns->{$col_name};
 		# here we translate rows
 		my $field_name = lc ($col_name); # oracle fix
 		
@@ -265,10 +268,8 @@ sub _init_make_accessors {
 				default => $col_meta->{mysql_values});
 		}
 		
-		if ($col_meta->{type_name} =~ /DATE|TIMESTAMP(?:\(\d+\))?|DATETIME/) {
-			#TODO
-			
-		}
+		# attach decoder for complex datatypes, as example date, datetime, timestamp
+		$class->attach_decoder ($col_meta);
 		
 		if (exists $col_meta->{X_IS_PK} and $col_meta->{X_IS_PK} == 1) {
 			
@@ -290,13 +291,63 @@ sub _init_make_accessors {
 			make_accessor ($class, "fetch_by_pk",          default => $fetch_by_pk_sub);
 		}
 		
-		make_accessor ($class, $field_name, is => 'rw');
+		# access to the precise field value or column value without cool accessors
+		
+		make_accessor ($class, $field_name, default => sub {
+			my $self = shift;
+			
+			unless (@_) {
+				# bad style?
+				return 
+					$self->{field_values}->{$field_name} || (
+					exists $self->columns->{$col_name}->{decoder}
+						? $self->columns->{$col_name}->{decoder}->() # ($self->{column_values}->{$col_name});
+						: $self->{column_values}->{$col_name});
+			}
+
+			die "too many parameters"  if @_ > 1;
+
+			$self->assign_values ($field_name => $_[0]);
+			
+		});
+		
+		make_accessor ($class, "_fetched_${field_name}", default => sub {
+			my $self = shift;
+			
+			unless (@_) {
+				return $self->{column_values}->{$col_name};
+			}
+
+			die "too many parameters";
+		});
+
+		make_accessor ($class, "_raw_${field_name}", default => sub {
+			my $self = shift;
+			
+			die "you must supply one parameter" unless @_ == 1;
+			
+			$self->{field_values}->{$field_name} = $_[0];
+		});
+
 	}
 	
 	make_accessor ($class, '_pk_', default => $pri_key);
 	make_accessor ($class, '_pk_column_', default => $pri_key_column);
 
 	return $class;
+}
+
+sub assign_values {
+	my $self = shift;
+	my $to_assign = {@_};
+	
+	foreach my $k (keys %$to_assign) {
+		$self->{field_values}->{$k} = $to_assign->{$k};
+	}
+}
+
+sub attach_decoder {
+	
 }
 
 sub _init_last {
@@ -467,10 +518,8 @@ sub _dbh_error {
 sub _prefix_manipulations {
 	my $self   = shift;
 	my $dir    = shift;
-	my $values = shift || $self;
+	my $values = shift;
 	my $in_place = shift || 0;
-	
-	return $values if ! ref $values;
 	
 	my $entities;
 	my $ent_key;
@@ -479,13 +528,19 @@ sub _prefix_manipulations {
 		$entities = $self->fields;
 		$ent_key = 'column_name';
 		$convert = 'value_to_type';
+		$values = $self->field_values
+			unless $values;
 	} elsif ($dir eq 'cols2fields') {
 		$entities = $self->cols;
 		$ent_key = 'field_name';
 		$convert = 'value_from_type';
+		$values = $self->column_values
+			unless $values;
 	} else {
 		die "you can't call _prefix_manipulations without direction";
 	}
+
+	return $values if ! ref $values;
 
 	my $place = $values;
 	unless ($in_place) {
@@ -547,41 +602,6 @@ sub columns_to_fields {
 	my $self = shift;
 	
 	$self->_prefix_manipulations ('cols2fields', shift, 0);
-}
-
-sub columns_to_fields_in_place {
-	my $self = shift;
-	
-	$self->_prefix_manipulations ('cols2fields', shift, 1);
-}
-
-sub pk_fields_prefixed {
-	my $self = shift;
-	
-	return $self->fields_prefixed (1);
-}
-
-sub remove_prefix_in_place {
-	my $self   = shift;
-	
-	my $col_trans = {reverse %{$self->_col_trans}};
-	
-	foreach my $col (keys %$self) {
-		
-		my $field = $col_trans->{$col};
-		next unless defined $field;
-		
-		$self->{$field} = delete $self->{$col};
-	}
-}
-
-sub deprefix_cols {
-	my $self = shift;
-	my @cols = @_;
-	
-	my $col_trans = {reverse %{$self->_col_trans}};
-	
-	my @result = map {$col_trans->{$_}} @cols;
 }
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

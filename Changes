@@ -1,3 +1,13 @@
+2011-04-14 Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.22
+	
+	completely rewritten
+	now contains values, fetched from db
+	new object interface
+	embed emulation
+	many minor improvements
+	
 2011-03-27 Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.21

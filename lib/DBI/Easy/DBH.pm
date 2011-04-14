@@ -96,6 +96,7 @@ sub no_fetch {
 		}
 		
 	};
+	
 	return undef
 		if $self->_dbh_error ($@);
 	

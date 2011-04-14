@@ -2,7 +2,6 @@ package DBI::Easy::Record::Collection;
 
 use Class::Easy;
 
-use DBI::Easy;
 use base qw(DBI::Easy);
 
 our $wrapper = 1;
@@ -104,18 +103,22 @@ sub records {
 
 	if (ref $_[0]) {
 		$where = shift;
-		%params = (@_);
+		%params = @_;
 	} else {
-		%params = (@_);
+		%params = @_;
 		$where = delete $params{where} || {};
 	}
 	
 	my $suffix = '';
 	my $bind_suffix = [];
 	
+	#TODO: REGRESSION FIX !!!
+	
 	if ($params{suffix} and ref $params{suffix} and ref $params{suffix} eq 'ARRAY') {
 		$suffix = shift @{$params{suffix}} || '';
 		$bind_suffix = delete $params{suffix};
+	} elsif ($params{suffix}) {
+		$suffix = delete $params{suffix} || '';
 	}
 	
 	my @fetch_params = $self->make_sql_and_bind ('sql_select', undef, $where, $suffix, $bind_suffix, %params);
@@ -125,10 +128,10 @@ sub records {
 		debug "fetch by record";
 		
 		$self->fetch_handled (@fetch_params, sub {
-			my $rec = shift;
+			my $row = shift;
 			
-			bless $rec, $self->record_package;
-			$rec->columns_to_fields_in_place;
+			my $rec = $self->record_package->new (column_values => $row);
+			
 			return $params{fetch_handler}->($rec);
 		});
 		
@@ -142,6 +145,15 @@ sub records {
 		
 		return $db_result;
 	}
+}
+
+sub list_of_record_hashes {
+	my $self = shift;
+	my $records = $self->records (@_);
+	
+	my $list_of_hashes = [map {$_->hash} @$records];
+	
+	return $list_of_hashes;
 }
 
 sub update {
@@ -211,7 +223,7 @@ sub tree {
 	
 	my $where_prefixed = $self->fields_to_columns ($where_w_filter);
 	
-	my ($select, $bind) = $self->sql_select ($where_prefixed, $suffix);
+	my ($select, $bind) = $self->sql_select (where => $where_prefixed, suffix => $suffix);
 	
 	# warn $select, ' => ', defined $bind ? join ', ', @$bind : '[empty]';
 	
@@ -248,28 +260,26 @@ sub new_record_from_request {
 }
 
 sub columns_to_fields_in_place {
-	my $self     = shift;
-	my $records  = shift;
+	my $self = shift;
+	my $rows = shift;
 	
 	my $rec_pack = $self->record_package;
 	
-	if (UNIVERSAL::isa ($records, 'ARRAY')) {
+	if (UNIVERSAL::isa ($rows, 'ARRAY')) {
 	
-		foreach my $record_counter (0 .. $#$records) {
+		foreach my $row_counter (0 .. $#$rows) {
 			
-			my $record = $records->[$record_counter];
+			my $row = $rows->[$row_counter];
 			
-			bless $record, $rec_pack;
-			$record->columns_to_fields_in_place;
+			$rows->[$row_counter] = $rec_pack->new (column_values => $row);
 		}
-	} elsif (UNIVERSAL::isa ($records, 'HASH')) {
+	} elsif (UNIVERSAL::isa ($rows, 'HASH')) {
 	
-		foreach my $record_key (keys %$records) {
+		foreach my $row_key (keys %$rows) {
 			
-			my $record = $records->{$record_key};
+			my $row = $rows->{$row_key};
 			
-			bless $record, $rec_pack;
-			$record->columns_to_fields_in_place;
+			$rows->{$row_key} = $rec_pack->new (column_values => $row);
 		}
 	}
 }

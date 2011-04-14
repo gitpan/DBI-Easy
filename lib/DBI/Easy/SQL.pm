@@ -195,7 +195,7 @@ sub sql_set {
 
 sub sql_insert {
 	my $self = shift;
-	my $hash = shift || $self->fields;
+	my $hash = shift || $self->field_values;
 	
 	my ($set, $bind) = $self->sql_chunks_for_fields ($hash, 'insert');
 	
@@ -228,7 +228,8 @@ sub sql_update {
 		$update_all   = $params->{all};
 	}
 	
-	return if ! $update_all and ! defined $where_values;
+	warn ("nothing to set in update"), return unless $set_values;
+	warn ("please use update_all for update everything"), return unless $where_values;
 	
 	my $table_name = $self->table_quoted;
 	
@@ -244,8 +245,24 @@ sub sql_update {
 
 sub sql_delete {
 	my $self = shift;
-	my $where_values = shift;
-	my $suffix = shift || '';
+	my $where_values;
+	my $suffix = '';
+	my $update_all = 0;
+	
+	my $params;
+	
+	if (ref $_[0]) {
+		$where_values = shift;
+		$suffix = shift || '';
+	} else {
+		$params = {@_};
+		$where_values = $params->{where};
+		$suffix       = $params->{suffix} || '';
+		$update_all   = $params->{all};
+	}
+	
+	warn ("please use delete_all for delete everything"), return
+		unless $where_values;
 	
 	my $table_name = $self->table_quoted;
 	
@@ -254,7 +271,7 @@ sub sql_delete {
 	
 	my $statement = "delete from $table_name";
 	if (!$where_statement) {
-		warn "you can't delete all data from table, use delete_table_contents";
+		warn "you can't delete all data from table, use delete_all or truncate";
 		return;
 	}
 	
@@ -265,13 +282,15 @@ sub sql_delete {
 
 sub sql_delete_by_pk {
 	my $self   = shift;
+	# BAD!!! needs to be rewritten
 	my $where  = shift || {};
 	my $suffix = shift || '';
 	
 	my $_pk_column_ = $self->_pk_column_;
-	my $where_hash = {%$where, $_pk_column_ => $self->{$self->_pk_}};
+	my $_pk_        = $self->_pk_;
+	my $where_hash = {%$where, $_pk_column_ => $self->$_pk_};
 	
-	return $self->sql_delete ($where_hash, $suffix);
+	return $self->sql_delete (where => $where_hash, suffix => $suffix);
 	
 }
 
@@ -296,14 +315,22 @@ sub sql_select_by_pk {
 
 sub sql_update_by_pk {
 	my $self   = shift;
-	my $where  = shift || {};
-	my $suffix = shift || '';
+	my %params = @_;
 	
-	my $set_hash = $self->fields_to_columns;
+	my $set_hash = $params{set} || $self->fields_to_columns;
+	
 	my $_pk_column_ = $self->_pk_column_;
-	my $where_hash = {%$where, $_pk_column_ => $self->{$self->_pk_}};
 	
-	my ($sql, $bind) = $self->sql_update ($set_hash, $where_hash, $suffix);
+	return unless $self->{column_values}->{$_pk_column_};
+	
+	my $where_hash = {
+		%{$params{where} || {}},
+		$_pk_column_ => $self->{column_values}->{$_pk_column_}
+	};
+	
+	my ($sql, $bind) = $self->sql_update (
+		set => $set_hash, where => $where_hash, suffix => $params{suffix}
+	);
 	
 	return $sql, $bind;
 	
@@ -311,7 +338,10 @@ sub sql_update_by_pk {
 
 sub sql_column_list {
 	my $self = shift;
-	my $fieldset = shift || $self->fieldset;
+	my $fieldset = shift;
+	unless (defined $fieldset) {
+		$fieldset = $self->fieldset;
+	}
 	
 	return '*'
 		if !defined $fieldset or !$fieldset;
@@ -341,7 +371,7 @@ sub sql_column_list {
 sub sql_select {
 	my $self   = shift;
 	
-	my %params = (@_);
+	my %params = @_;
 	
 	my $where  = $params{where} || {};
 	my $suffix = $params{suffix} || '';

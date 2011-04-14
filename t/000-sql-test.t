@@ -133,16 +133,12 @@ ok ($ins_statement =~ /insert into [^\s]+ \((?:\S+(?:, )?)+\) values \(\?/);
 
 my ($up_statement, $up_bind_values) = $test->sql_update (set => $values);
 
-# diag $up_statement, $up_bind_values;
-
 ok (!defined ($up_statement), 'update_all');
 
 #ok ($up_statement =~ /update \S+ set (?:\S+\s\=\s\?)+/);
 #ok ($up_statement !~ /where/);
 
-($up_statement, $up_bind_values) = $test->sql_update (
-	set => $values, where => {active => 1}
-);
+($up_statement, $up_bind_values) = $test->sql_update (set => $values, where => {active => 1});
 
 # diag $up_statement;
 

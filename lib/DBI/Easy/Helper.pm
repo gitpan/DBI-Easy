@@ -79,7 +79,7 @@ sub value_from_type {
 	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME' or $type eq 'TIMESTAMP')) {
 	
 		my $t = localtime;
-		my $timestamp = eval {(Time::Piece->strptime ($value, "%Y-%m-%d %H:%M:%S") - $t->tzoffset)->epoch};
+		my $timestamp = eval {(Time::Piece->strptime ($value, $pack->_datetime_format) - $t->tzoffset)->epoch};
 		return $timestamp
 			if $timestamp;
 	}
@@ -95,7 +95,7 @@ sub value_to_type {
 	my $dbh   = shift; # check for driver
 
 	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME' or $type eq 'TIMESTAMP')) {
-		my $timestamp = Time::Piece->new ($value)->strftime ("%Y-%m-%d %H:%M:%S");
+		my $timestamp = Time::Piece->new ($value)->strftime ($pack->_datetime_format);
 		return $timestamp
 			if $timestamp;
 	}
