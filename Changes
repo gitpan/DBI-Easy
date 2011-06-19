@@ -1,3 +1,12 @@
+2011-06-14 Ivan Baktsheev <dot.and.thing@gmail.com>
+
+	Release 0.23
+	
+	fixed issues with auto decode/encode data fields
+	fixed oracle package
+	now test completes on mysql and postgresql
+
+
 2011-04-14 Ivan Baktsheev <dot.and.thing@gmail.com>
 
 	Release 0.22

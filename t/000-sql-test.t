@@ -69,8 +69,8 @@ my $col_count = scalar keys %$col_state;
 
 ok $col_state->{account_id}->{nullable} == 0;
 ok $col_state->{name}->{nullable} == 0;
-ok $col_state->{pass}->{nullable} == 0;
-ok $col_state->{pass}->{default}  eq 'abracadabra';
+ok $col_state->{pass}->{nullable} == 1;
+# ok $col_state->{pass}->{default}  eq 'abracadabra';
 
 ok ($col_count and ($col_count > 0));
 

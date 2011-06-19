@@ -193,7 +193,7 @@ sub hash {
 			if ! defined $col_meta and ! exists $result->{$col_meta->{field_name}};
 		
 		$result->{$col_meta->{field_name}} = (
-			exists $col_meta->{decoder} ? $col_meta->{decoder}->(): $col_value
+			exists $col_meta->{decoder} ? $col_meta->{decoder}->($self): $col_value
 		) if ! exists $result->{$col_meta->{field_name}};
 	}
 	

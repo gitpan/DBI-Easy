@@ -4,6 +4,8 @@ use Class::Easy;
 
 use base qw(DBI::Easy::Vendor::Base);
 
+use Time::Piece;
+
 # alter session set nls_date_format='yyyy-mm-dd hh24:mi:ss';
 # select to_char(some_date, 'yyyy-mm-dd hh24:mi:ss') my_date
 #   from some_table;
@@ -34,25 +36,11 @@ sub _init_vendor {
 	$class->_date_format ($format);
 }
 
-sub decode_value {
-	my $self = shift;
-	my $column_name = shift;
-	my $column_val  = shift;
-	
-	if ($self->columns->{$column_name}->{type_name} eq 'DATE') {
-		return eval {(Time::Piece->strptime ($column_val, "%Y-%m-%d %H:%M:%S") - $t->tzoffset)->epoch};
-	}
-	
-	return $column_val;
-}
-
 sub quote_identifier {
 	my $class = shift;
 	
 	return shift;
 }
-
-sub 
 
 # $ENV{'NLS_TIMESTAMP_FORMAT'}
 

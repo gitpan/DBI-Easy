@@ -403,6 +403,24 @@ sub sql_select {
 		$group_by = "group by $group"
 			if $group;
 	}
+
+	my $limits = '';
+	
+	# parameter expansion here
+	if (defined $params{limit} and $params{limit} =~ /^(\d+)$/) {
+		# TODO: limit/offset by driver
+		# and SQL:2008 OFFSET start { ROW | ROWS }
+		# FETCH { FIRST | NEXT } [ count ] { ROW | ROWS } ONLY
+		$limits .= "limit $1";
+		if (defined $params{offset} and $params{offset} =~ /^(\d+)$/) {
+			$limits .= " offset $1";
+		}
+		
+		unless ($params{sort_field}) {
+			warn "you must use sort_(field|order) when you use limit/offset, we decide to set sort_field to primary key";
+			$params{sort_field} = $self->_pk_;
+		}
+	}
 	
 	my $order_by = '';
 
@@ -416,22 +434,6 @@ sub sql_select {
 		$order = 'desc' unless $order;
 		
 		$order_by = "order by $order_expr $order";
-	}
-	
-	my $limits = '';
-	
-	# parameter expansion here
-	if (defined $params{limit} and $params{limit} =~ /^(\d+)$/) {
-		# TODO: limit/offset by driver
-		# and SQL:2008 OFFSET start { ROW | ROWS }
-		# FETCH { FIRST | NEXT } [ count ] { ROW | ROWS } ONLY
-		$limits .= "limit $1";
-		if (defined $params{offset} and $params{offset} =~ /^(\d+)$/) {
-			$limits .= " offset $1";
-		}
-		
-		critical "you must use sort_(field|order) when you use limit/offset"
-			unless $order_by;
 	}
 	
 	my $table_name = $self->table_quoted;

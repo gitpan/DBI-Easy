@@ -1,13 +1,13 @@
 package DBI::Easy;
 
-use Class::Easy;
+use Class::Easy::Base;
 
 use DBI 1.611;
 
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.22';
+$VERSION = '0.23';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:
@@ -301,7 +301,7 @@ sub _init_make_accessors {
 				return 
 					$self->{field_values}->{$field_name} || (
 					exists $self->columns->{$col_name}->{decoder}
-						? $self->columns->{$col_name}->{decoder}->() # ($self->{column_values}->{$col_name});
+						? $self->columns->{$col_name}->{decoder}->($self) # ($self->{column_values}->{$col_name});
 						: $self->{column_values}->{$col_name});
 			}
 
@@ -347,8 +347,21 @@ sub assign_values {
 }
 
 sub attach_decoder {
+	my $class = shift;
+	my $col_meta = shift;
 	
+	my $type = $col_meta->{type_name};
+	
+	if (defined $type and $H->is_rich_type ($type)) {
+		
+		$col_meta->{decoder} = sub {
+			my $self = shift;
+			my $value = $self->column_values->{$col_meta->{column_name}};
+			return $H->value_from_type ($type, $value, $self);
+		}
+	}
 }
+
 
 sub _init_last {
 
@@ -541,7 +554,7 @@ sub _prefix_manipulations {
 	}
 
 	return $values if ! ref $values;
-
+	
 	my $place = $values;
 	unless ($in_place) {
 		$place = {};
@@ -575,10 +588,20 @@ sub _prefix_manipulations {
 		my $v = $value;
 		
 		# we must convert only convertible values
+		# field => 'value'
+		# _field => {'>', 'value'}
 		if ($column_prefix eq '') {
 			$v = $H->$convert (
 				$ent->{type_name}, $value, $self
 			);
+		} elsif (
+			$column_prefix eq '_' and ref $value and ref $value eq 'HASH'
+			and keys %$value == 1
+		) {
+			my $condition = (keys %$value)[0];
+			$v = $condition . $self->quote ($H->$convert (
+				$ent->{type_name}, $value->{$condition}, $self
+			));
 		}
 		
 		next unless exists $ent->{$ent_key};

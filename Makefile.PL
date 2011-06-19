@@ -15,9 +15,9 @@ WriteMakefile(
 		},
 	},
 	PREREQ_PM => {
-		'Class::Easy' => "0.16",
+		'Class::Easy' => "0.17",
 		'DBI'         => "1.611",
 		'DBD::SQLite' => "1.25",
-		'Time::Piece' => 0,
+		'Time::Piece' => "1.20",
 	}
 );

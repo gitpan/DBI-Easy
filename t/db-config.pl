@@ -44,9 +44,9 @@ sub init_db {
 	
 	} elsif ($db eq 'mysql') {
 	
-		$ENV{DBI_DSN}  ||= 'DBI:mysql:database=perltests';
-		$ENV{DBI_USER} ||= '';
-		$ENV{DBI_PASS} ||= '';
+		$ENV{DBI_DSN}  ||= 'DBI:mysql:database=test';
+		$ENV{DBI_USER} ||= 'test';
+		$ENV{DBI_PASS} ||= 's3kr1t';
 	
 	} elsif ($db eq 'sqlite') {
 
@@ -58,11 +58,13 @@ sub init_db {
 	
 	$::dbh = DBI->connect;
 	
-	my $serial_type = 'integer';
+	my $serial_type   = 'integer';
 	my $serial_suffix = 'autoincrement';
+	my $date_col_type = 'integer';
 	if ($ENV{DBI_DSN} =~ /^DBI:(?:mysql|pg)/i) {
 		$serial_type = 'serial'; # 'integer';
 		$serial_suffix = ''; # 'auto_increment';
+		$date_col_type = 'timestamp';
 	}
 	
 	$::dbh->do ('drop table if exists account');
@@ -71,8 +73,9 @@ sub init_db {
 		create table account (
 			account_id $serial_type primary key $serial_suffix,
 			name text not null,
-			pass text not null default "abracadabra",
-			meta text
+			pass text,
+			meta text,
+			created_date $date_col_type
 		);
 	]);
 	
@@ -119,7 +122,7 @@ sub init_db {
 		create table smf_users (
 			id_user $serial_type primary key $serial_suffix,
 			name text not null,
-			pass text not null default "abracadabra",
+			pass text not null,
 			meta text
 		);
 	]);

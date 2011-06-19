@@ -70,16 +70,33 @@ sub r {
 	return $self->_connector_maker ('record', @_);
 }
 
+our $types;
+
+map {
+	$types->{$_} = 'date'
+} split (/\|/, 'DATE|TIMESTAMP(6)|DATETIME|TIMESTAMP|timestamp|timestamp without time zone');
+
+sub is_rich_type {
+	my $pack = shift;
+	my $type = shift;
+	
+	return $types->{$type}
+		if defined $type and exists $types->{$type};
+}
+
 sub value_from_type {
 	my $pack  = shift;
 	my $type  = shift;
 	my $value = shift;
-	my $dbh   = shift; # check for driver
+	my $model = shift; # check for driver
 	
-	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME' or $type eq 'TIMESTAMP')) {
+	if (defined $type and $types->{$type} eq 'date') {
 	
 		my $t = localtime;
-		my $timestamp = eval {(Time::Piece->strptime ($value, $pack->_datetime_format) - $t->tzoffset)->epoch};
+		my $timestamp = eval {(Time::Piece->strptime ($value, $model->_datetime_format) - $t->tzoffset)->epoch};
+		return 0
+			if $t->tzoffset->seconds + $timestamp == 0;
+
 		return $timestamp
 			if $timestamp;
 	}
@@ -92,10 +109,12 @@ sub value_to_type {
 	my $pack  = shift;
 	my $type  = shift;
 	my $value = shift;
-	my $dbh   = shift; # check for driver
-
-	if (defined $type and ($type eq 'DATE' or $type eq 'TIMESTAMP(6)' or $type eq 'DATETIME' or $type eq 'TIMESTAMP')) {
-		my $timestamp = Time::Piece->new ($value)->strftime ($pack->_datetime_format);
+	my $model = shift; # check for driver
+	
+#	warn "$type => $value, $types->{$type} ".$model->_datetime_format."\n";
+	
+	if (defined $type and $types->{$type} eq 'date') {
+		my $timestamp = Time::Piece->new ([CORE::localtime ($value)])->strftime ($model->_datetime_format);
 		return $timestamp
 			if $timestamp;
 	}

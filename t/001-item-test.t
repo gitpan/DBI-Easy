@@ -140,6 +140,45 @@ ok $contact->value eq 'apla@local', "contact value is: " . $contact->value;
 
 ok ! $contact->type, 'type defined and exists, but not fetched';
 
+# testing date conversion
+my $time = time;
+
+$account = $rec_a->new ({name => 'apla', meta => 'pam-pam', created_date => $time});
+
+ok $account->save;
+
+$db_account = ref($account)->fetch_by_id ($account->id);
+
+SKIP: {
+	skip "this database doesn't know about date types", 1
+		unless $db_account->columns->{created_date}->{decoder};
+	ok $db_account->column_values->{created_date} =~ /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/, 'fetched from db: ' . $db_account->column_values->{created_date};
+};
+
+ok $db_account->created_date == $time, '... but when accessed: ' . $db_account->created_date;
+
+$rec_a->new ({name => 'apla2', meta => 'pam-pam2', created_date => $time + 2})->save;
+$rec_a->new ({name => 'apla3', meta => 'pam-pam3', created_date => $time + 3})->save;
+
+my $coll_a = collection_for ('account')->new;
+
+logger (default => *STDERR);
+
+#use Data::Dumper;
+my $records = $coll_a->records (where => {_created_date => {'>=', $time}});
+
+#warn Dumper $records;
+
+ok @$records == 3;
+
+$records = $coll_a->records (where => {_created_date => {'>', $time}});
+
+ok @$records == 2;
+
+$records = $coll_a->records (where => {_created_date => {'<', $time + 1}});
+
+ok @$records == 1;
+
 # DEPRECATED
 #make_accessor ($rec_c, 'dump_fields_include', default => [qw(value type id)]);
 #ok scalar keys %{$contact->TO_JSON} eq 2;
