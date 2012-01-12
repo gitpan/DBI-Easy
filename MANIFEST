@@ -21,3 +21,4 @@ t/003-int-vars.t
 t/004-speed.t
 t/005-collection.t
 t/db-config.pl
+META.json                                Module JSON meta-data (added by MakeMaker)

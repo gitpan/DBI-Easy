@@ -7,7 +7,7 @@ use DBI 1.611;
 #use Hash::Util;
 
 use vars qw($VERSION);
-$VERSION = '0.23';
+$VERSION = '0.24';
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # interface splitted to various sections:

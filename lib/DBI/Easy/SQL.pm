@@ -320,12 +320,13 @@ sub sql_update_by_pk {
 	my $set_hash = $params{set} || $self->fields_to_columns;
 	
 	my $_pk_column_ = $self->_pk_column_;
+	my $_pk_ = $self->_pk_;
 	
-	return unless $self->{column_values}->{$_pk_column_};
+	return unless $self->{column_values}->{$_pk_column_} || $self->{field_values}->{$_pk_};
 	
 	my $where_hash = {
 		%{$params{where} || {}},
-		$_pk_column_ => $self->{column_values}->{$_pk_column_}
+		$_pk_column_ => $self->{column_values}->{$_pk_column_} || $self->{field_values}->{$_pk_}
 	};
 	
 	my ($sql, $bind) = $self->sql_update (
